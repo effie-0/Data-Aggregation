@@ -1,12 +1,14 @@
 configuration centerNodeAppC {}
 implementation {
   components MainC, LedsC;
+  components new TimeMilliC() as sendTimer;
   components centerNodeC as App;
   components ActiveMessageC;
   components SerialActiveMessageC;
 
-  APP.Boot -> MainC.Boot;
-  APP.Leds -> LedsC.Leds;
+  App.Boot -> MainC.Boot;
+  App.Leds -> LedsC.Leds;
+  App.sendTimer -> sendTimer;
 
   App.Packet -> ActiveMessageC;
   App.AMSend -> ActiveMessageC.AMSend[AM_NODEMSG];

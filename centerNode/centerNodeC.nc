@@ -1,15 +1,20 @@
 #include "NodeMessage.h"
 #include "AskMsg.h"
+#include "ACKMSg.h"
 #include "SeqMsg.h"
 #include "FinishReceive.h"
 
 #define MAX_PCK_NUM 2000
 #define MIN_PCK_NUM 1
 #define GROUP_ID 18
+#define ROOT_NODE 0
+#define TIMEOUT_PERIOD 5000
 
 module centerNodeC {
   uses interface Boot;
   uses interface Leds;
+  uses interface Timer<TMilli> as sendTimer;
+
   uses interface Packet as Packet;
   uses interface AMSend as AMSend;
   uses interface Receive as Receive;
@@ -29,6 +34,7 @@ implementation {
   bool Sbusy; // debug
   bool calFinished; // finish computation
   bool sndFinished; // finished whole result send and got ACK
+  bool collectFinished; // All data collected
 
   // Stored 2000 data
   uint32_t Data[MAX_PCK_NUM+1];
@@ -46,7 +52,6 @@ implementation {
 
   uint16_t recvSeq; // the max seqnum received
   uint16_t i; // iteration
-  uint16_t maxQueueSeq; // the max seqnum in AskQueue + 1
 
   event void Boot.booted() {
     for(i = 0; i <= MAX_PCK_NUM; i++) {
@@ -69,6 +74,10 @@ implementation {
 
     recvSeq = 0;
     maxQueueSeq = 0;
+
+    calFinished = FALSE;
+    sndFinished = FALSE;
+    collectFinished = FALSE;
 
     call RadioControl.start();
     call SerialControl.start();
@@ -157,6 +166,58 @@ implementation {
     }
   }
 
+  void Calculate() {
+    uint16_t mi;
+
+    mi = (MIN_PCK_NUM + MAX_PCK_NUM) / 2;
+    QuickSort(MIN_PCK_NUM, MAX_PCK_NUM);
+    result.max = Data[MAX_PCK_NUM];
+    result.min = Data[MIN_PCK_NUM];
+    result.sum = 0;
+    for(i = MIN_PCK_NUM; i < MAX_PCK_NUM; i++) {
+      result.sum += Data[i];
+    }
+    result.average = result.sum / (MAX_PCK_NUM - MIN_PCK_NUM + 1);
+    result.median = result[mi];
+
+    calFinished = TRUE;
+    call sendResultMessage();
+    call sendTimer.startPeriodic(TIMEOUT_PERIOD);
+  }
+
+  void QuickSort(uint16_t lo, uint16_t hi) {
+    uint16_t mi;
+
+    if (lo < hi) {
+      mi = Partition(lo, hi);
+      QuickSort(lo, mi-1);
+      QuickSort(mi+1, hi);
+    }
+  }
+
+  uint16_t Partition(uint16_t lo, uint16_t hi) {
+    uint32_t x;
+    uint32_t temp;
+    uint16_t j;
+
+    x =  = Data[hi];
+    i = lo - 1;
+    for(j = lo; j < hi; j++) {
+      if (Data[j] <= x) {
+        i += 1;
+        if (i != j) {
+          temp = Data[i];
+          Data[i] = Data[j];
+          Data[j] = temp;
+        }
+      }
+    }
+    i += 1;
+    Data[hi] = Data[i];
+    Data[i] = x;
+    return i;
+  }
+
   event void AMSend.sendDone(message_t* msg, error_t err) {
     busy = FALSE;
     if (calFinished) {
@@ -181,27 +242,42 @@ implementation {
     call Leds.led2Toggle();
     rcvPck = (SeqMsg*)payload;
 
-    if(len == sizeof(SeqMsg)) {
-      if(rcvPck->sequence_number == (recvSeq+1)) {
+    if (len == sizeof(SeqMsg)) {
+      if (rcvPck->sequence_number == (recvSeq+1)) {
         recvSeq += 1;
         Data[recvSeq] = rcvPck->random_integer;
+        if (recvSeq == MAX_PCK_NUM) {
+          collectFinished = TRUE;
+          Calculate();
+        }
       }
       else if (rcvPck->sequence_number > (recvSeq+1)) {
-        if ((recvSeq+1) > maxQueueSeq) {
-          maxQueueSeq = recvSeq + 1;
-        }
-        for(i = maxQueueSeq; i <= rcvPck->sequence_number; i++) {
+        for(i = (recvSeq+1); i <= rcvPck->sequence_number; i++) {
           AskQueue[queue_tail].seqnum = i;
           queue_tail += 1;
         }
-        maxQueueSeq = rcvPck->sequence_number + 1;
-        if(!busy) {
+        if (!busy) {
           sendAskMessage();
         }
       }
     }
     else if (len == sizeof(FinishReceive)) {
-      
+      if (recvSeq != MAX_PCK_NUM) {
+        for(i = (recvSeq+1); i <= MAX_PCK_NUM; i++) {
+          AskQueue[queue_tail].seqnum = i;
+          queue_tail += 1;
+        }
+        if (!busy) {
+          sendAskMessage();
+        }
+      }
+    }
+    else if (len == sizeof(ACKMsg)) {
+      sndFinished = TRUE;
+      call sendTimer.stop();
+      call Leds.led0On();
+      call Leds.led1On();
+      call Leds.led2On();
     }
 
     return msg;
@@ -209,5 +285,11 @@ implementation {
 
   event message_t* SReceive.receive(message_t* msg, void* payload, uint8_t len) {
 
+  }
+
+  event void sendTimer.fired() {
+    call sendTimer.stop();
+    call sendResultMessage();
+    call sendTimer.startPeriodic(TIMEOUT_PERIOD);
   }
 }
