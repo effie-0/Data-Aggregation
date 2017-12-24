@@ -182,6 +182,7 @@ implementation {
 
     calFinished = TRUE;
     call sendResultMessage();
+    call s_sendMessage(); // debug
     call sendTimer.startPeriodic(TIMEOUT_PERIOD);
   }
 
@@ -281,10 +282,6 @@ implementation {
     }
 
     return msg;
-  }
-
-  event message_t* SReceive.receive(message_t* msg, void* payload, uint8_t len) {
-
   }
 
   event void sendTimer.fired() {
