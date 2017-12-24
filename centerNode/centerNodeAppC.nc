@@ -1,6 +1,11 @@
-configuration centerNodeAppC {}
+configuration centerNodeAppC 
+{
+
+}
 implementation {
   components MainC, LedsC;
+  components new AMSenderC(6);
+  components new AMReceiverC(6);
   components new TimerMilliC() as dataTimer;
   components new TimerMilliC() as sendTimer;
   components centerNodeC as App;
@@ -13,8 +18,8 @@ implementation {
   App.dataTimer -> dataTimer;
 
   App.Packet -> ActiveMessageC;
-  App.AMSend -> ActiveMessageC.AMSend[AM_NODEMSG];
-  App.Receive -> ActiveMessageC.Receive[AM_NODEMSG];
+  App.AMSend -> AMSenderC;
+  App.Receive -> AMReceiverC;
 
   App.SPacket -> SerialActiveMessageC;
 	App.SAMSend -> SerialActiveMessageC.AMSend[AM_NODEMSG];

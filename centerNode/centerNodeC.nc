@@ -10,7 +10,7 @@
 #define GROUP_ID 18
 #define ROOT_NODE 0
 #define TIMEOUT_PERIOD 5000
-#define ASK_PERIOD 300
+#define ASK_PERIOD 100
 
 module centerNodeC {
   uses interface Boot;

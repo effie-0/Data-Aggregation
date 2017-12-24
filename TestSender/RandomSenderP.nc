@@ -8,7 +8,7 @@ module RandomSenderP
 	uses interface Packet;
 	uses interface AMPacket;
 	uses interface AMSend;
-	uses interface Receive;
+	uses interface Receive as Receive;
 	uses interface SplitControl;
 	uses interface Timer<TMilli> as Timer0;
 	uses interface Random;
@@ -17,9 +17,19 @@ module RandomSenderP
 }
 implementation
 {
+
+	uint16_t count = 0;
+	uint32_t nums[2000];
+	uint32_t seed = 1;
+	message_t pkt;
+	bool busy;
+	bool ACK;
+
+	message_t queue[12];
+	int qh = 0, qt = 0;
+
 	event void Boot.booted()
 	{
-
 		while(SUCCESS != call Read.read())
 			;
 	}
@@ -41,9 +51,6 @@ implementation
 	
 	event void SplitControl.stopDone(error_t err) { }
 	
-	message_t queue[12];
-	int qh = 0, qt = 0;
-	
 	void queue_in(data_packge* dp)
 	{
 		if((qh+1)%12 == qt)
@@ -62,17 +69,10 @@ implementation
 			post senddp();
 	}
 	
-	uint16_t count = 0;
-	uint32_t nums[2000];
-	uint32_t seed = 1;
-	message_t pkt;
-	bool busy;
-	bool sendACK;
-	
 	event void Timer0.fired()
 	{
-		sendACK = FALSE;
 		data_packge dp;
+		ACK = FALSE;
 		dp.sequence_number = count%2000 + 1;
         //send from 1 ... 2000
 		if(count < 2000)
@@ -92,8 +92,8 @@ implementation
 	
 	event void AMSend.sendDone(message_t* msg, error_t err)
 	{
-		if(sendACK) {
-			sendACK = FALSE;
+		if (ACK) {
+			ACK = FALSE;
 			busy = FALSE;
 		}
 		else
@@ -106,8 +106,8 @@ implementation
 	}
 
 	void sendACK() {
-		sendACK = TRUE;
 		ACKMsg* ackPck;
+		ACK = TRUE;
 
 		ackPck = (ACKMsg*)(call Packet.getPayload(&pkt, sizeof(ACKMsg)));
 		if (ackPck == NULL) {
@@ -115,7 +115,7 @@ implementation
 		}
 
 		ackPck->group_id = 1;
-		if(call AMSend.send(AM_BROADCAST_ADDR, &askpkt, sizeof(ACKMsg)) == SUCCESS) {
+		if (call AMSend.send(AM_BROADCAST_ADDR, &pkt, sizeof(ACKMsg)) == SUCCESS) {
 			busy = TRUE;
 		}
 	}
@@ -125,6 +125,7 @@ implementation
 			if(!busy) {
 				sendACK();
 			}
+			call Leds.led2Toggle();
 		}
 	}
 }
