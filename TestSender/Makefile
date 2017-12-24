@@ -1,0 +1,2 @@
+COMPONENT=RandomSenderC
+include $(MAKERULES)
