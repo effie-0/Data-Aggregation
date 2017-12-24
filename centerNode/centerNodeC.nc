@@ -6,7 +6,7 @@
 
 #define MAX_PCK_NUM 2000
 #define MIN_PCK_NUM 1
-#define QUEUE_SIZE 1000
+#define QUEUE_SIZE 500
 #define GROUP_ID 18
 #define ROOT_NODE 0
 #define TIMEOUT_PERIOD 5000
@@ -265,11 +265,13 @@ implementation {
 
   event message_t* Receive.receive(message_t* msg, void* payload, uint8_t len) {
     SeqMsg* rcvPck;
+    FinishReceive* frPck;
+    ACKMsg* ackPck;
 
     call Leds.led2Toggle();
-    rcvPck = (SeqMsg*)payload;
 
     if (len == sizeof(SeqMsg)) {
+      rcvPck = (SeqMsg*)payload;
       if (Data[rcvPck->sequence_number] == -1) {
         Data[rcvPck->sequence_number] = rcvPck->random_integer;
       }
@@ -281,19 +283,25 @@ implementation {
         }
       }
     }
-    else if (len == sizeof(FinishReceive) && rcvPck->groupid == GROUP_ID) {
-      if (!askStart) {
-        askStart = TRUE;
-        AskForData();
-        call dataTimer.startPeriodic(ASK_PERIOD);
+    else if (len == sizeof(FinishReceive)) {
+      frPck = (FinishReceive*)payload;
+      if (frPck->groupid == GROUP_ID) {
+        if (!askStart) {
+          askStart = TRUE;
+          AskForData();
+          call dataTimer.startPeriodic(ASK_PERIOD);
+        }
       }
     }
-    else if (len == sizeof(ACKMsg) && rcvPck->group_id == GROUP_ID) {
-      sndFinished = TRUE;
-      call sendTimer.stop();
-      call Leds.led0On();
-      call Leds.led1On();
-      call Leds.led2On();
+    else if (len == sizeof(ACKMsg)) {
+      ackPck = (ACKMsg*)payload;
+      if (ackPck->group_id == GROUP_ID) {
+        sndFinished = TRUE;
+        call sendTimer.stop();
+        call Leds.led0On();
+        call Leds.led1On();
+        call Leds.led2On();
+      }
     }
 
     return msg;
@@ -308,7 +316,7 @@ implementation {
   event void dataTimer.fired() {
     call dataTimer.stop();
     AskForData();
-    if(!collectFinished) {
+    if (!collectFinished) {
       call dataTimer.startPeriodic(ASK_PERIOD);
     }
   }

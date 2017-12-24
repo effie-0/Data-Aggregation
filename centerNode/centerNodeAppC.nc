@@ -10,6 +10,7 @@ implementation {
   App.Boot -> MainC.Boot;
   App.Leds -> LedsC.Leds;
   App.sendTimer -> sendTimer;
+  App.dataTimer -> dataTimer;
 
   App.Packet -> ActiveMessageC;
   App.AMSend -> ActiveMessageC.AMSend[AM_NODEMSG];
