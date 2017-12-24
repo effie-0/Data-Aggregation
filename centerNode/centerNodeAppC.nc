@@ -1,6 +1,7 @@
 configuration centerNodeAppC {}
 implementation {
   components MainC, LedsC;
+  components new TimerMilliC() as dataTimer;
   components new TimerMilliC() as sendTimer;
   components centerNodeC as App;
   components ActiveMessageC;

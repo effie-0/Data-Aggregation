@@ -3,7 +3,7 @@
 
 typedef struct FinishReceive
 {
-  uint16_t nodeid;
+  uint16_t groupid;
   uint16_t finishSeqNum;
 } FinishReceive;
 

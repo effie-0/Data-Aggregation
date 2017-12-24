@@ -6,15 +6,17 @@
 
 #define MAX_PCK_NUM 2000
 #define MIN_PCK_NUM 1
-#define QUEUE_SIZE 500
+#define QUEUE_SIZE 1000
 #define GROUP_ID 18
 #define ROOT_NODE 0
 #define TIMEOUT_PERIOD 5000
+#define ASK_PERIOD 300
 
 module centerNodeC {
   uses interface Boot;
   uses interface Leds;
   uses interface Timer<TMilli> as sendTimer;
+  uses interface Timer<TMilli> as dataTimer;
 
   uses interface Packet as Packet;
   uses interface AMSend as AMSend;
@@ -36,6 +38,7 @@ implementation {
   bool calFinished; // finish computation
   bool sndFinished; // finished whole result send and got ACK
   bool collectFinished; // All data collected
+  bool askStart;
 
   // Stored 2000 data
   uint32_t Data[MAX_PCK_NUM+1];
@@ -56,7 +59,7 @@ implementation {
 
   event void Boot.booted() {
     for(i = 0; i <= MAX_PCK_NUM; i++) {
-      Data[i] = 0;
+      Data[i] = -1;
     }
     for(i = 0; i < QUEUE_SIZE; i++) {
       AskQueue[i].groupid = GROUP_ID;
@@ -80,6 +83,7 @@ implementation {
     calFinished = FALSE;
     sndFinished = FALSE;
     collectFinished = FALSE;
+    askStart = FALSE;
 
     call RadioControl.start();
     call SerialControl.start();
@@ -223,6 +227,24 @@ implementation {
     call sendTimer.startPeriodic(TIMEOUT_PERIOD);
   }
 
+  void AskForData() {
+    queue_head = 0;
+    queue_tail = 0;
+    for(i = MIN_PCK_NUM; i <= MAX_PCK_NUM; i++) {
+      if (Data[i] == -1 && queue_tail != QUEUE_SIZE) {
+        AskQueue[queue_tail].seqnum = i;
+        queue_tail += 1;
+      }
+    }
+    if (queue_head == queue_tail) {
+      collectFinished = TRUE;
+      Calculate();
+    }
+    else {
+      sendAskMessage();
+    }
+  }
+
   event void AMSend.sendDone(message_t* msg, error_t err) {
     busy = FALSE;
     if (calFinished) {
@@ -248,36 +270,25 @@ implementation {
     rcvPck = (SeqMsg*)payload;
 
     if (len == sizeof(SeqMsg)) {
-      if (rcvPck->sequence_number == (recvSeq+1)) {
-        recvSeq += 1;
-        Data[recvSeq] = rcvPck->random_integer;
-        if (recvSeq == MAX_PCK_NUM) {
-          collectFinished = TRUE;
-          Calculate();
-        }
+      if (Data[rcvPck->sequence_number] == -1) {
+        Data[rcvPck->sequence_number] = rcvPck->random_integer;
       }
-      else if (rcvPck->sequence_number > (recvSeq+1)) {
-        for(i = (recvSeq+1); i <= rcvPck->sequence_number; i++) {
-          AskQueue[queue_tail].seqnum = i;
-          queue_tail += 1;
-        }
-        if (!busy) {
-          sendAskMessage();
+      if (rcvPck->sequence_number == MAX_PCK_NUM) {
+        if (!askStart) {
+          askStart = TRUE;
+          AskForData();
+          call dataTimer.startPeriodic(ASK_PERIOD);
         }
       }
     }
-    else if (len == sizeof(FinishReceive)) {
-      if (recvSeq != MAX_PCK_NUM) {
-        for(i = (recvSeq+1); i <= MAX_PCK_NUM; i++) {
-          AskQueue[queue_tail].seqnum = i;
-          queue_tail += 1;
-        }
-        if (!busy) {
-          sendAskMessage();
-        }
+    else if (len == sizeof(FinishReceive) && rcvPck->groupid == GROUP_ID) {
+      if (!askStart) {
+        askStart = TRUE;
+        AskForData();
+        call dataTimer.startPeriodic(ASK_PERIOD);
       }
     }
-    else if (len == sizeof(ACKMsg)) {
+    else if (len == sizeof(ACKMsg) && rcvPck->group_id == GROUP_ID) {
       sndFinished = TRUE;
       call sendTimer.stop();
       call Leds.led0On();
@@ -292,6 +303,14 @@ implementation {
     call sendTimer.stop();
     sendResultMessage();
     call sendTimer.startPeriodic(TIMEOUT_PERIOD);
+  }
+
+  event void dataTimer.fired() {
+    call dataTimer.stop();
+    AskForData();
+    if(!collectFinished) {
+      call dataTimer.startPeriodic(ASK_PERIOD);
+    }
   }
 
   event message_t* SReceive.receive(message_t* msg, void* payload, uint8_t len) {
