@@ -1,11 +1,12 @@
 #include "NodeMessage.h"
 #include "AskMsg.h"
-#include "ACKMSg.h"
-#include "SeqMsg.h"
-#include "FinishReceive.h"
+#include "ACKMsg.h"
+#include "../sensorNode/SeqMsg.h"
+#include "../sensorNode/FinishReceive.h"
 
 #define MAX_PCK_NUM 2000
 #define MIN_PCK_NUM 1
+#define QUEUE_SIZE 500
 #define GROUP_ID 18
 #define ROOT_NODE 0
 #define TIMEOUT_PERIOD 5000
@@ -40,11 +41,11 @@ implementation {
   uint32_t Data[MAX_PCK_NUM+1];
 
   // AskMsg to be sent immediately
-  AskMsg AskQueue[MAX_PCK_NUM+1];
+  AskMsg AskQueue[QUEUE_SIZE];
   uint16_t queue_head;
   uint16_t queue_tail;
 
-  NodeMessage result;
+  NodeMsg result;
 
   message_t askpkt; // Ask sensorNode for data
   message_t resultpkt; // Send result to Node 0
@@ -56,6 +57,8 @@ implementation {
   event void Boot.booted() {
     for(i = 0; i <= MAX_PCK_NUM; i++) {
       Data[i] = 0;
+    }
+    for(i = 0; i < QUEUE_SIZE; i++) {
       AskQueue[i].groupid = GROUP_ID;
       AskQueue[i].seqnum = 0;
     }
@@ -73,7 +76,6 @@ implementation {
     sndFinished = FALSE;
 
     recvSeq = 0;
-    maxQueueSeq = 0;
 
     calFinished = FALSE;
     sndFinished = FALSE;
@@ -115,6 +117,8 @@ implementation {
     }
     else {
       busy = FALSE;
+      queue_head = 0;
+      queue_tail = 0;
       call Leds.led1Off();
     }
   }
@@ -166,24 +170,27 @@ implementation {
     }
   }
 
-  void Calculate() {
-    uint16_t mi;
+  uint16_t Partition(uint16_t lo, uint16_t hi) {
+    uint32_t x;
+    uint32_t temp;
+    uint16_t j, k;
 
-    mi = (MIN_PCK_NUM + MAX_PCK_NUM) / 2;
-    QuickSort(MIN_PCK_NUM, MAX_PCK_NUM);
-    result.max = Data[MAX_PCK_NUM];
-    result.min = Data[MIN_PCK_NUM];
-    result.sum = 0;
-    for(i = MIN_PCK_NUM; i < MAX_PCK_NUM; i++) {
-      result.sum += Data[i];
+    x = Data[hi];
+    k = lo - 1;
+    for(j = lo; j < hi; j++) {
+      if (Data[j] <= x) {
+        k += 1;
+        if (k != j) {
+          temp = Data[k];
+          Data[k] = Data[j];
+          Data[j] = temp;
+        }
+      }
     }
-    result.average = result.sum / (MAX_PCK_NUM - MIN_PCK_NUM + 1);
-    result.median = result[mi];
-
-    calFinished = TRUE;
-    call sendResultMessage();
-    call s_sendMessage(); // debug
-    call sendTimer.startPeriodic(TIMEOUT_PERIOD);
+    k += 1;
+    Data[hi] = Data[k];
+    Data[k] = x;
+    return k;
   }
 
   void QuickSort(uint16_t lo, uint16_t hi) {
@@ -196,27 +203,24 @@ implementation {
     }
   }
 
-  uint16_t Partition(uint16_t lo, uint16_t hi) {
-    uint32_t x;
-    uint32_t temp;
-    uint16_t j;
+  void Calculate() {
+    uint16_t mi;
 
-    x =  = Data[hi];
-    i = lo - 1;
-    for(j = lo; j < hi; j++) {
-      if (Data[j] <= x) {
-        i += 1;
-        if (i != j) {
-          temp = Data[i];
-          Data[i] = Data[j];
-          Data[j] = temp;
-        }
-      }
+    mi = (MIN_PCK_NUM + MAX_PCK_NUM) / 2;
+    QuickSort(MIN_PCK_NUM, MAX_PCK_NUM);
+    result.max = Data[MAX_PCK_NUM];
+    result.min = Data[MIN_PCK_NUM];
+    result.sum = 0;
+    for(i = MIN_PCK_NUM; i < MAX_PCK_NUM; i++) {
+      result.sum += Data[i];
     }
-    i += 1;
-    Data[hi] = Data[i];
-    Data[i] = x;
-    return i;
+    result.average = result.sum / (MAX_PCK_NUM - MIN_PCK_NUM + 1);
+    result.median = Data[mi];
+
+    calFinished = TRUE;
+    sendResultMessage();
+    s_sendMessage(); // debug
+    call sendTimer.startPeriodic(TIMEOUT_PERIOD);
   }
 
   event void AMSend.sendDone(message_t* msg, error_t err) {
@@ -286,7 +290,12 @@ implementation {
 
   event void sendTimer.fired() {
     call sendTimer.stop();
-    call sendResultMessage();
+    sendResultMessage();
     call sendTimer.startPeriodic(TIMEOUT_PERIOD);
+  }
+
+  event message_t* SReceive.receive(message_t* msg, void* payload, uint8_t len) {
+    // do nothing
+    return msg;
   }
 }

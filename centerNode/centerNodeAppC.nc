@@ -1,7 +1,7 @@
 configuration centerNodeAppC {}
 implementation {
   components MainC, LedsC;
-  components new TimeMilliC() as sendTimer;
+  components new TimerMilliC() as sendTimer;
   components centerNodeC as App;
   components ActiveMessageC;
   components SerialActiveMessageC;
