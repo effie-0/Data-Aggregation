@@ -11,11 +11,10 @@ module sensorNodeC {
 	uses interface Boot;
 	uses interface Leds;
 	
-	uses interface Packet as Packet;
-	uses interface AMSend as AMSend;
-	uses interface Receive;
-
-	uses interface SplitControl as RadioControl;
+	uses interface Packet;
+	uses interface AMSend;
+	uses interface Receive as dataReceive;
+	uses interface SplitControl as radioControl;
 }
 
 implementation {
@@ -49,16 +48,16 @@ implementation {
 		queue_tail = 0;
 		sentFinishReceive = 0;
 
-		call RadioControl.start();
+		call radioControl.start();
 	}
 
-	event void RadioControl.startDone(error_t err) {
-		if (err != SUCCESS) {
-			call RadioControl.start();
-		}
+    event void radioControl.startDone(error_t err)
+	{
+		if(err != SUCCESS)
+			call radioControl.start();
 	}
 	
-	event void RadioControl.stopDone(error_t err) {}
+	event void radioControl.stopDone(error_t err) { }
 
 	void sendMessage() {
 		SeqMsg* sndPck;
@@ -89,7 +88,7 @@ implementation {
 		}
 	}
 
-	event message_t* Receive.receive(message_t* msg, void* payload, uint8_t len) {
+	event message_t* dataReceive.receive(message_t* msg, void* payload, uint8_t len) {
 		// NodeMsg* rcvPck;
 		uint16_t dis;
 		SeqMsg *seqMsgRcvPck;
@@ -110,7 +109,7 @@ implementation {
 			        sndPck->finishSeqNum = MAX_INTEGER_NUM;
 				    if (call AMSend.send(AM_BROADCAST_ADDR, &pkt, sizeof(FinishReceive)) == SUCCESS) {
 			            busy = TRUE;
-			            call Leds.led2Toggle();
+			            call Leds.led1Toggle();
 		            }
 			    }
 			}
