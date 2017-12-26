@@ -1,11 +1,13 @@
+#include "./NodeMessage.h"
+
 configuration centerNodeAppC 
 {
 
 }
 implementation {
   components MainC, LedsC;
-  components new AMSenderC(6);
-  components new AMReceiverC(6);
+  components new AMSenderC(AM_NODEMSG);
+  components new AMReceiverC(AM_NODEMSG);
   components new TimerMilliC() as dataTimer;
   components new TimerMilliC() as sendTimer;
   components centerNodeC as App;
@@ -17,7 +19,7 @@ implementation {
   App.sendTimer -> sendTimer;
   App.dataTimer -> dataTimer;
 
-  App.Packet -> ActiveMessageC;
+  App.Packet -> AMSenderC;
   App.AMSend -> AMSenderC;
   App.Receive -> AMReceiverC;
 

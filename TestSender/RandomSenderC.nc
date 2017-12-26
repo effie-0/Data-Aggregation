@@ -8,8 +8,8 @@ implementation
 {
 	components MainC, LedsC;
 	components ActiveMessageC;
-	components new AMSenderC(6);
-	components new AMReceiverC(6);
+	components new AMSenderC(AM_NODEMSG);
+	components new AMReceiverC(AM_NODEMSG);
 	components RandomSenderP;
 	components new TimerMilliC() as Timer0;
 	components RandomC;

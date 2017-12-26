@@ -6,7 +6,7 @@
 
 #define MAX_PCK_NUM 2000
 #define MIN_PCK_NUM 1
-#define QUEUE_SIZE 500
+#define QUEUE_SIZE 200
 #define GROUP_ID 18
 #define ROOT_NODE 0
 #define TIMEOUT_PERIOD 5000
@@ -56,6 +56,7 @@ implementation {
 
   uint16_t recvSeq; // the max seqnum received
   uint16_t i; // iteration
+  uint16_t count;
 
   event void Boot.booted() {
     for(i = 0; i <= MAX_PCK_NUM; i++) {
@@ -87,6 +88,8 @@ implementation {
 
     call RadioControl.start();
     call SerialControl.start();
+
+    count = 0;
   }
 
   event void RadioControl.startDone(error_t err) {
@@ -141,12 +144,12 @@ implementation {
       sndPck->median = result.median;
       if(call AMSend.send(AM_BROADCAST_ADDR, &resultpkt, sizeof(NodeMsg)) == SUCCESS) {
         busy = TRUE;
-        call Leds.led0On();
+        call Leds.led1On();
       }
     }
     else {
       busy = FALSE;
-      call Leds.led0Off();
+      call Leds.led1Off();
     }
 
   }
@@ -154,7 +157,7 @@ implementation {
   void s_sendMessage() {
     NodeMsg* sndPck;
     if (calFinished && !sndFinished) {
-      sndPck = (NodeMsg*)(call Packet.getPayload(&spkt, sizeof(NodeMsg)));
+      sndPck = (NodeMsg*)(call SPacket.getPayload(&spkt, sizeof(NodeMsg)));
       if (sndPck == NULL) {
         return;
       }
@@ -165,12 +168,12 @@ implementation {
       sndPck->median = result.median;
       if(call SAMSend.send(AM_BROADCAST_ADDR, &spkt, sizeof(NodeMsg)) == SUCCESS) {
         Sbusy = TRUE;
-        call Leds.led0On();
+        call Leds.led1On();
       }
     }
     else {
       Sbusy = FALSE;
-      call Leds.led0Off();
+      call Leds.led1Off();
     }
   }
 
@@ -248,7 +251,7 @@ implementation {
   event void AMSend.sendDone(message_t* msg, error_t err) {
     busy = FALSE;
     if (calFinished) {
-      call Leds.led0Off();
+      call Leds.led1Off();
     }
     else {
       queue_head += 1;
@@ -260,7 +263,7 @@ implementation {
 
   event void SAMSend.sendDone(message_t* msg, error_t err) {
     Sbusy = FALSE;
-    call Leds.led0Off();
+    call Leds.led1Off();
   }
 
   event message_t* Receive.receive(message_t* msg, void* payload, uint8_t len) {
@@ -268,13 +271,18 @@ implementation {
     FinishReceive* frPck;
     ACKMsg* ackPck;
 
+    if (count % 100 == 0) {
+      call Leds.led0Toggle();
+    }
+    count += 1;
+
     if (len == sizeof(SeqMsg)) {
       rcvPck = (SeqMsg*)payload;
-      if (rcvPck->sequence_number % 10 == 0) {
-        call Leds.led2Toggle();
-      }
       if (Data[rcvPck->sequence_number] == -1) {
         Data[rcvPck->sequence_number] = rcvPck->random_integer;
+        if (rcvPck->sequence_number % 100 == 0) {
+          call Leds.led2Toggle();
+        }
       }
       if (rcvPck->sequence_number == MAX_PCK_NUM) {
         if (!askStart) {
