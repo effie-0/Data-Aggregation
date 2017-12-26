@@ -268,10 +268,11 @@ implementation {
     FinishReceive* frPck;
     ACKMsg* ackPck;
 
-    call Leds.led2Toggle();
-
     if (len == sizeof(SeqMsg)) {
       rcvPck = (SeqMsg*)payload;
+      if (rcvPck->sequence_number % 10 == 0) {
+        call Leds.led2Toggle();
+      }
       if (Data[rcvPck->sequence_number] == -1) {
         Data[rcvPck->sequence_number] = rcvPck->random_integer;
       }
