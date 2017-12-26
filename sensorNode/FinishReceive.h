@@ -7,4 +7,6 @@ typedef struct FinishReceive
   uint16_t finishSeqNum;
 } FinishReceive;
 
+enum { AM_FINISHRECEIVE = 10 };
+
 #endif

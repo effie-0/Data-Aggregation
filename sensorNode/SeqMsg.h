@@ -6,4 +6,6 @@ typedef nx_struct SeqMsg {
 	nx_uint32_t random_integer;
 } SeqMsg;
 
+enum { AM_SEQMSG = 10 };
+
 #endif
