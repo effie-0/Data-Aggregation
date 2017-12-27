@@ -3,10 +3,11 @@
 #include "ACKMsg.h"
 #include "../sensorNode/SeqMsg.h"
 #include "../sensorNode/FinishReceive.h"
+#include "printf.h"
 
 #define MAX_PCK_NUM 2000
 #define MIN_PCK_NUM 1
-#define QUEUE_SIZE 500
+#define MY_QUEUE_SIZE 200
 #define GROUP_ID 18
 #define ROOT_NODE 0
 #define TIMEOUT_PERIOD 5000
@@ -23,12 +24,12 @@ module centerNodeC {
   uses interface Receive as Receive;
 
   // use serial port for debug
-  uses interface Packet as SPacket;
-	uses interface AMSend as SAMSend;
-	uses interface Receive as SReceive;
+ //  uses interface Packet as SPacket;
+	// uses interface AMSend as SAMSend;
+	// uses interface Receive as SReceive;
 
   uses interface SplitControl as RadioControl;
-  uses interface SplitControl as SerialControl; // debug
+  // uses interface SplitControl as SerialControl; // debug
 }
 
 implementation {
@@ -44,7 +45,7 @@ implementation {
   uint32_t Data[MAX_PCK_NUM+1];
 
   // AskMsg to be sent immediately
-  AskMsg AskQueue[QUEUE_SIZE];
+  AskMsg AskQueue[MY_QUEUE_SIZE];
   uint16_t queue_head;
   uint16_t queue_tail;
 
@@ -56,12 +57,13 @@ implementation {
 
   uint16_t recvSeq; // the max seqnum received
   uint16_t i; // iteration
+  uint16_t count;
 
   event void Boot.booted() {
     for(i = 0; i <= MAX_PCK_NUM; i++) {
       Data[i] = -1;
     }
-    for(i = 0; i < QUEUE_SIZE; i++) {
+    for(i = 0; i < MY_QUEUE_SIZE; i++) {
       AskQueue[i].groupid = GROUP_ID;
       AskQueue[i].seqnum = 0;
     }
@@ -86,7 +88,12 @@ implementation {
     askStart = FALSE;
 
     call RadioControl.start();
-    call SerialControl.start();
+    // call SerialControl.start();
+
+    count = 0;
+
+    // debug
+    printf("init\n");
   }
 
   event void RadioControl.startDone(error_t err) {
@@ -97,13 +104,13 @@ implementation {
 
   event void RadioControl.stopDone(error_t err) {}
 
-  event void SerialControl.startDone(error_t err) {
-    if (err != SUCCESS) {
-      call SerialControl.start();
-    }
-  }
+  // event void SerialControl.startDone(error_t err) {
+  //   if (err != SUCCESS) {
+  //     call SerialControl.start();
+  //   }
+  // }
 
-  event void SerialControl.stopDone(error_t err) {}
+  // event void SerialControl.stopDone(error_t err) {}
 
   void sendAskMessage() {
     AskMsg* askPck;
@@ -140,39 +147,41 @@ implementation {
       sndPck->average = result.average;
       sndPck->median = result.median;
       if(call AMSend.send(AM_BROADCAST_ADDR, &resultpkt, sizeof(NodeMsg)) == SUCCESS) {
+        // debug
+        printf("Sent result message.\n");
         busy = TRUE;
-        call Leds.led0On();
+        call Leds.led1On();
       }
     }
     else {
       busy = FALSE;
-      call Leds.led0Off();
+      call Leds.led1Off();
     }
 
   }
 
-  void s_sendMessage() {
-    NodeMsg* sndPck;
-    if (calFinished && !sndFinished) {
-      sndPck = (NodeMsg*)(call Packet.getPayload(&spkt, sizeof(NodeMsg)));
-      if (sndPck == NULL) {
-        return;
-      }
-      sndPck->groupid = result.groupid;
-      sndPck->max = result.max;
-      sndPck->min = result.min;
-      sndPck->average = result.average;
-      sndPck->median = result.median;
-      if(call SAMSend.send(AM_BROADCAST_ADDR, &spkt, sizeof(NodeMsg)) == SUCCESS) {
-        Sbusy = TRUE;
-        call Leds.led0On();
-      }
-    }
-    else {
-      Sbusy = FALSE;
-      call Leds.led0Off();
-    }
-  }
+  // void s_sendMessage() {
+  //   NodeMsg* sndPck;
+  //   if (calFinished && !sndFinished) {
+  //     sndPck = (NodeMsg*)(call SPacket.getPayload(&spkt, sizeof(NodeMsg)));
+  //     if (sndPck == NULL) {
+  //       return;
+  //     }
+  //     sndPck->groupid = result.groupid;
+  //     sndPck->max = result.max;
+  //     sndPck->min = result.min;
+  //     sndPck->average = result.average;
+  //     sndPck->median = result.median;
+  //     if(call SAMSend.send(AM_BROADCAST_ADDR, &spkt, sizeof(NodeMsg)) == SUCCESS) {
+  //       Sbusy = TRUE;
+  //       call Leds.led1On();
+  //     }
+  //   }
+  //   else {
+  //     Sbusy = FALSE;
+  //     call Leds.led1Off();
+  //   }
+  // }
 
   uint16_t Partition(uint16_t lo, uint16_t hi) {
     uint32_t x;
@@ -223,7 +232,7 @@ implementation {
 
     calFinished = TRUE;
     sendResultMessage();
-    s_sendMessage(); // debug
+    // s_sendMessage(); // debug
     call sendTimer.startPeriodic(TIMEOUT_PERIOD);
   }
 
@@ -231,7 +240,7 @@ implementation {
     queue_head = 0;
     queue_tail = 0;
     for(i = MIN_PCK_NUM; i <= MAX_PCK_NUM; i++) {
-      if (Data[i] == -1 && queue_tail != QUEUE_SIZE) {
+      if (Data[i] == -1 && queue_tail != MY_QUEUE_SIZE) {
         AskQueue[queue_tail].seqnum = i;
         queue_tail += 1;
       }
@@ -248,7 +257,7 @@ implementation {
   event void AMSend.sendDone(message_t* msg, error_t err) {
     busy = FALSE;
     if (calFinished) {
-      call Leds.led0Off();
+      call Leds.led1Off();
     }
     else {
       queue_head += 1;
@@ -258,22 +267,31 @@ implementation {
     }
   }
 
-  event void SAMSend.sendDone(message_t* msg, error_t err) {
-    Sbusy = FALSE;
-    call Leds.led0Off();
-  }
+  // event void SAMSend.sendDone(message_t* msg, error_t err) {
+  //   Sbusy = FALSE;
+  //   call Leds.led1Off();
+  // }
 
   event message_t* Receive.receive(message_t* msg, void* payload, uint8_t len) {
     SeqMsg* rcvPck;
     FinishReceive* frPck;
     ACKMsg* ackPck;
 
-    call Leds.led2Toggle();
+    // debug
+    printf("Received message\n");
+
+    if (count % 100 == 0) {
+      call Leds.led0Toggle();
+    }
+    count += 1;
 
     if (len == sizeof(SeqMsg)) {
       rcvPck = (SeqMsg*)payload;
       if (Data[rcvPck->sequence_number] == -1) {
         Data[rcvPck->sequence_number] = rcvPck->random_integer;
+        if (rcvPck->sequence_number % 100 == 0) {
+          call Leds.led2Toggle();
+        }
       }
       if (rcvPck->sequence_number == MAX_PCK_NUM) {
         if (!askStart) {
@@ -321,8 +339,8 @@ implementation {
     }
   }
 
-  event message_t* SReceive.receive(message_t* msg, void* payload, uint8_t len) {
-    // do nothing
-    return msg;
-  }
+  // event message_t* SReceive.receive(message_t* msg, void* payload, uint8_t len) {
+  //   // do nothing
+  //   return msg;
+  // }
 }

@@ -1,2 +1,2 @@
-COMPONENT=sensorNodeC
+COMPONENT=sensorNodeAppC
 include $(MAKERULES)

@@ -1,9 +1,10 @@
+#include "./NodeMessage.h"
 configuration sensorNodeAppC {}
 implementation {
 	components sensorNodeC as App;
 	components MainC, LedsC;
-	components new AMSenderC(0);
-    components new AMReceiverC(10) as dataReceiver;
+	components new AMSenderC(AM_NODEMSG);
+    components new AMReceiverC(AM_NODEMSG);
 	components ActiveMessageC;
 
 	App.Boot -> MainC;
@@ -11,7 +12,7 @@ implementation {
 	
 	App.Packet -> AMSenderC;
 	App.AMSend -> AMSenderC;
-	App.dataReceive -> dataReceiver;
+    App.Receive -> AMReceiverC;
 
-	App.radioControl -> ActiveMessageC;
+	App.RadioControl -> ActiveMessageC;
 }

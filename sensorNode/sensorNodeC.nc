@@ -2,7 +2,7 @@
 #include "AskMsg.h"
 #include "FinishReceive.h"
 
-#define MAX_INTEGER_NUM 2000
+#define MAX_INTEGER_NUM 1000
 #define MAX_ASK_MSG_NUM 500
 #define ROOT_NODE 0
 #define GROUP_ID 18
@@ -11,10 +11,10 @@ module sensorNodeC {
 	uses interface Boot;
 	uses interface Leds;
 	
-	uses interface Packet;
-	uses interface AMSend;
-	uses interface Receive as dataReceive;
-	uses interface SplitControl as radioControl;
+	uses interface Packet as Packet;
+    uses interface AMSend as AMSend;
+	uses interface Receive as Receive;
+	uses interface SplitControl as RadioControl;
 }
 
 implementation {
@@ -30,6 +30,7 @@ implementation {
 	uint16_t queue_head;
 	uint16_t queue_tail;
 	uint16_t sentFinishReceive;
+	uint16_t count;
 
 	// iteration variable
 	uint16_t i;
@@ -48,16 +49,19 @@ implementation {
 		queue_tail = 0;
 		sentFinishReceive = 0;
 
-		call radioControl.start();
+		call RadioControl.start();
+
+		// debug
+		count = 0;
 	}
 
-    event void radioControl.startDone(error_t err)
+    event void RadioControl.startDone(error_t err)
 	{
 		if(err != SUCCESS)
-			call radioControl.start();
+			call RadioControl.start();
 	}
 	
-	event void radioControl.stopDone(error_t err) { }
+	event void RadioControl.stopDone(error_t err) { }
 
 	void sendMessage() {
 		SeqMsg* sndPck;
@@ -88,14 +92,17 @@ implementation {
 		}
 	}
 
-	event message_t* dataReceive.receive(message_t* msg, void* payload, uint8_t len) {
+	event message_t* Receive.receive(message_t* msg, void* payload, uint8_t len) {
 		// NodeMsg* rcvPck;
 		uint16_t dis;
 		SeqMsg *seqMsgRcvPck;
 		AskMsg *askMsgRcvPck;
 		FinishReceive *sndPck;
 
-		call Leds.led0Toggle();
+		if (count % 100 == 0) {
+            call Leds.led0Toggle();
+         }
+         count += 1;
 		// rcvPck = (NodeMsg*)payload;
 		if(len == sizeof(SeqMsg)) {
 			seqMsgRcvPck = (SeqMsg*)payload;
