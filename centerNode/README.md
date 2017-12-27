@@ -12,9 +12,3 @@ Author/Contact:
 `make telosb install,55 bsl,/dev/ttyUSB0`，
 其中55表示基站节点的编号(group_id*3+1, group_id=18)，`/dev/ttyUSB0`是通过 `motelist` 得到的端口
 6. 现在节点就能够正常的工作了
-
-### 获取debug信息
-如果想要使用控制台获取当前的debug信息，那么应该进行如下操作：
-1. 将节点连接电脑
-2. 将程序烧录到节点之后，输入`java net.tinyos.tools.PrintfClient -comm serial@/dev/ttyUSB0:telosb`,其中`dev/ttyUSB0`是通过`motelist` 得到的端口
-3. 将这个节点准备好之后，再打开发送消息的节点，就可以看到debug信息了
