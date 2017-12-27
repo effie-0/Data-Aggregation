@@ -13,9 +13,9 @@ implementation {
   components new TimerMilliC() as sendTimer;
   components centerNodeC as App;
   components ActiveMessageC;
-  // components SerialActiveMessageC;
-  components PrintfC;
-  components SerialStartC;
+  components SerialActiveMessageC;
+  // components PrintfC;
+  // components SerialStartC;
 
   App.Boot -> MainC.Boot;
   App.Leds -> LedsC.Leds;
@@ -26,10 +26,9 @@ implementation {
   App.AMSend -> AMSenderC;
   App.Receive -> AMReceiverC;
 
-  // App.SPacket -> SerialActiveMessageC;
-	// App.SAMSend -> SerialActiveMessageC.AMSend[AM_NODEMSG];
-	// App.SReceive -> SerialActiveMessageC.Receive[AM_NODEMSG];
+  App.SPacket -> SerialActiveMessageC;
+	App.SAMSend -> SerialActiveMessageC.AMSend[AM_NODEMSG];
 
   App.RadioControl -> ActiveMessageC;
-  // App.SerialControl -> SerialActiveMessageC;
+  App.SerialControl -> SerialActiveMessageC;
 }

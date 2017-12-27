@@ -24,17 +24,17 @@ module centerNodeC {
   uses interface Receive as Receive;
 
   // use serial port for debug
- //  uses interface Packet as SPacket;
-	// uses interface AMSend as SAMSend;
-	// uses interface Receive as SReceive;
+  uses interface Packet as SPacket;
+	uses interface AMSend as SAMSend;
 
   uses interface SplitControl as RadioControl;
-  // uses interface SplitControl as SerialControl; // debug
+  uses interface SplitControl as SerialControl; // debug
 }
 
 implementation {
   // status
   bool busy;
+  bool busyIterating;
   bool Sbusy; // debug
   bool calFinished; // finish computation
   bool sndFinished; // finished whole result send and got ACK
@@ -54,6 +54,7 @@ implementation {
   message_t askpkt; // Ask sensorNode for data
   message_t resultpkt; // Send result to Node 0
   message_t spkt; // serial pkt
+  message_t debugpkt;
 
   uint16_t recvSeq; // the max seqnum received
   uint16_t i; // iteration
@@ -83,6 +84,7 @@ implementation {
     sndFinished = FALSE;
     collectFinished = FALSE;
     askStart = FALSE;
+    busyIterating = FALSE;
 
     call RadioControl.start();
     // call SerialControl.start();
@@ -93,6 +95,8 @@ implementation {
     // printf("init\n");
   }
 
+
+
   event void RadioControl.startDone(error_t err) {
     if (err != SUCCESS) {
       call RadioControl.start();
@@ -102,13 +106,13 @@ implementation {
   event void RadioControl.stopDone(error_t err) {
   }
 
-  // event void SerialControl.startDone(error_t err) {
-  //   if (err != SUCCESS) {
-  //     call SerialControl.start();
-  //   }
-  // }
+  event void SerialControl.startDone(error_t err) {
+    if (err != SUCCESS) {
+       call SerialControl.start();
+     }
+  }
 
-  // event void SerialControl.stopDone(error_t err) {}
+  event void SerialControl.stopDone(error_t err) {}
 
   void sendAskMessage() {
     AskMsg* askPck;
@@ -223,6 +227,7 @@ implementation {
   void Calculate() {
     uint16_t mi;
 
+    call Leds.led0On();
     // printf("Calculate\n");
     mi = (MIN_PCK_NUM + MAX_PCK_NUM) / 2;
     QuickSort(MIN_PCK_NUM, MAX_PCK_NUM);
@@ -242,7 +247,7 @@ implementation {
   }
 
   void AskForData() {
-    printf("AskForData\n");
+    //printf("AskForData\n");
     if (queue_head != queue_tail) {
       // haven't finished asking
       return;
@@ -250,30 +255,37 @@ implementation {
 
     queue_head = 0;
     queue_tail = 0;
+    busyIterating = TRUE;
     for(i = MIN_PCK_NUM; i <= MAX_PCK_NUM; i++) {
       if (Data[i] == -1 && queue_tail != MY_QUEUE_SIZE) {
         AskQueue[queue_tail].seqnum = i;
         queue_tail += 1;
       }
     }
+    busyIterating = FALSE;
 
     if (queue_head == queue_tail) {
-      printf("queue_head == queue_tail\n");
+      //printf("queue_head == queue_tail\n");
       collectFinished = TRUE;
       Calculate();
     }
     else {
       // debug
-      if (queue_head == queue_tail - 1) {
-        printf("queue_head == queue_tail - 1\n");
-        printf("%ld\n", AskQueue[queue_tail - 1].seqnum);
-        printf("%ld\n", Data[AskQueue[queue_tail - 1].seqnum]);
-      }
-      printf("queue_tail: %u, seqnum: %u\n", queue_tail, AskQueue[queue_tail-1].seqnum);
+      // if (queue_head == queue_tail - 1) {
+      //   printf("queue_head == queue_tail - 1\n");
+      //   printf("%ld\n", AskQueue[queue_tail - 1].seqnum);
+      //   printf("%ld\n", Data[AskQueue[queue_tail - 1].seqnum]);
+      // }
+      //printf("queue_tail: %u, seqnum: %u\n", queue_tail, AskQueue[queue_tail-1].seqnum);
       if (!busy) {
         sendAskMessage();
       }
     }
+  }
+
+  event void SAMSend.sendDone(message_t* msg, error_t err) {
+    Sbusy = FALSE;
+    call Leds.led0Off();
   }
 
   event void AMSend.sendDone(message_t* msg, error_t err) {
@@ -300,38 +312,51 @@ implementation {
     SeqMsg* rcvPck;
     FinishReceive* frPck;
     ACKMsg* ackPck;
+    NodeMsg* debugPCK;
+    debugPCK = (NodeMsg*)(call SPacket.getPayload(&debugpkt, sizeof(NodeMsg)));
 
     // debug
     // printf("Received message\n");
-
+    count += 1;
+    if (busyIterating) {
+      return msg;
+    }
     if (count % 100 == 0) {
      call Leds.led2Toggle();
     }
-    count += 1;
-    if (askStart && count % 500 == 0) {
+    if (count % 500 == 0 && askStart) {
       AskForData();
+      return msg;
     }
 
     if (len == sizeof(SeqMsg)) {
       rcvPck = (SeqMsg*)payload;
+      debugPCK->max = rcvPck->sequence_number;
+      debugPCK->min = rcvPck->random_integer;
+      //if (!Sbusy) {
+        call SAMSend.send(AM_BROADCAST_ADDR, &debugpkt, sizeof(NodeMsg));
+        call Leds.led0Toggle();
+        Sbusy = TRUE;
+      //}
       if (Data[rcvPck->sequence_number] == -1) {
         Data[rcvPck->sequence_number] = rcvPck->random_integer;
         // debug
         // printf("new seq: %u, int: %ld\n", rcvPck->sequence_number, rcvPck->random_integer);
         // debug
-        printf("received seq: %u, int: %ld\n", rcvPck->sequence_number, rcvPck->random_integer);
-        if (askStart) {
-          printf("SeqMsg, seq: %u\n", rcvPck->sequence_number);
-        }
+        // printf("received seq: %u, int: %ld\n", rcvPck->sequence_number, rcvPck->random_integer);
+        // if (askStart) {
+        //   printf("SeqMsg, seq: %u\n", rcvPck->sequence_number);
+        // }
         // if (rcvPck->sequence_number % 100 == 0) {
         //   call Leds.led2Toggle();
         // }
+
       }
       if (rcvPck->sequence_number == MAX_PCK_NUM) {
         if (!askStart) {
           askStart = TRUE;
           // AskForData();
-          call dataTimer.startPeriodic(ASK_PERIOD);
+          // call dataTimer.startPeriodic(ASK_PERIOD);
         }
       }
     }
@@ -345,7 +370,7 @@ implementation {
           // printf("ask for data\n");
           askStart = TRUE;
           // AskForData();
-          call dataTimer.startPeriodic(ASK_PERIOD);
+          // call dataTimer.startPeriodic(ASK_PERIOD);
         }
       }
     }
@@ -356,7 +381,7 @@ implementation {
         // printf("received ACKMsg\n");
         sndFinished = TRUE;
         call sendTimer.stop();
-        call Leds.led0On();
+        // call Leds.led0On();
         call Leds.led1On();
         call Leds.led2On();
       }
@@ -381,7 +406,7 @@ implementation {
     }
     if (queue_head != queue_tail) {
       // debug
-      printf("head: %u, tail: %u\n", queue_head, queue_tail);
+      // ssprintf("head: %u, tail: %u\n", queue_head, queue_tail);
       call dataTimer.startPeriodic(ASK_PERIOD);
       return;
     }
