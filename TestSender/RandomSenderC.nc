@@ -1,4 +1,4 @@
-
+#include "printf.h"
 #include "./Calculate.h"
 #include "../centerNode/NodeMessage.h"
 
@@ -15,6 +15,8 @@ implementation
 	components new TimerMilliC() as Timer0;
 	components RandomC;
 	components new SensirionSht11C();
+	components PrintfC;
+    components SerialStartC;
 	
 	RandomSenderP.Boot -> MainC;
 	RandomSenderP.SplitControl -> ActiveMessageC;

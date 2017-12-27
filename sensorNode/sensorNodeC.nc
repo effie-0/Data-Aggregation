@@ -77,9 +77,8 @@ implementation {
 			
 		if (call AMSend.send(AM_BROADCAST_ADDR, &pkt, sizeof(SeqMsg)) == SUCCESS) {
 			// debug
-			printf("Sent SeqMsg. seq: %u, int: %ld\n", sndPck->sequence_number, sndPck->random_integer);
+			// printf("Sent SeqMsg. seq: %u, int: %ld\n", sndPck->sequence_number, sndPck->random_integer);
 			busy = TRUE;
-			call Leds.led1Toggle();
 		}
 	}
 
@@ -87,7 +86,7 @@ implementation {
 		busy = FALSE;
 		if (sentFinishReceive == 0) {
 			// debug
-			printf("Sent finish receive\n");
+			// printf("Sent finish receive\n");
 			sentFinishReceive = 1;
 			return;
 		}
@@ -124,7 +123,7 @@ implementation {
 			        sentFinishReceive = 0;
 				    if (call AMSend.send(AM_BROADCAST_ADDR, &pkt, sizeof(FinishReceive)) == SUCCESS) {
 			            busy = TRUE;
-			            call Leds.led1Toggle();
+			            call Leds.led1On();
 		            }
 			    }
 			}
@@ -135,7 +134,7 @@ implementation {
 			// printf("randomIntegers[askMsgRcvPck->seqnum - 1]: %u\n", randomIntegers[askMsgRcvPck->seqnum - 1]);
 			if (askMsgRcvPck->seqnum > 0 && askMsgRcvPck->seqnum <= MAX_INTEGER_NUM && randomIntegers[askMsgRcvPck->seqnum - 1] != -1) {
 				// debug
-				printf("Asked seq %u is recorded.\n", askMsgRcvPck->seqnum);
+				// printf("Asked seq %u is recorded.\n", askMsgRcvPck->seqnum);
 				call Leds.led2Toggle();
 				AskedSequenceNumbersQueue[queue_tail] = askMsgRcvPck->seqnum;
 			    queue_tail = (queue_tail + 1) % MAX_ASK_MSG_NUM;

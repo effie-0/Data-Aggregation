@@ -1,5 +1,6 @@
-
+#include "printf.h"
 #include "Calculate.h"
+#include "../centerNode/NodeMessage.h"
 
 module RandomSenderP
 {
@@ -121,11 +122,16 @@ implementation
 	}
 
 	event message_t* Receive.receive(message_t* msg, void* payload, uint8_t len) {
+		calculate_result *result;
 		if (len == sizeof(calculate_result)) {
+			// debug
+			call Leds.led2On();
+			result = (calculate_result*)payload;
+			printf("Received result\n");
+			printf("max: %ld, min: %ld, sum: %ld, average: %ld, median: %ld\n", result->max, result->min, result->sum, result->average, result->median);
 			if(!busy) {
 				sendACK();
 			}
-			call Leds.led2Toggle();
 		}
 		return msg;
 	}
