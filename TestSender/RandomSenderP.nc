@@ -127,5 +127,6 @@ implementation
 			}
 			call Leds.led2Toggle();
 		}
+		return msg;
 	}
 }
