@@ -39,6 +39,8 @@ implementation {
   bool sndFinished; // finished whole result send and got ACK
   bool collectFinished; // All data collected
   bool askStart;
+  bool bit1check; // for sorting
+  bool bit2check;
 
   // Stored 2000 data
   uint32_t Data[MAX_PCK_NUM+2];
@@ -58,6 +60,13 @@ implementation {
   uint16_t recvSeq; // the max seqnum received
   uint16_t i; // iteration
   uint16_t count;
+
+  uint16_t mleft;// for sorting
+  uint16_t mright;
+  uint16_t total;
+  uint32_t bit1;
+  uint32_t bit2;
+  uint32_t x;
 
   event void Boot.booted() {
     uint16_t j;
@@ -89,13 +98,15 @@ implementation {
     askStart = FALSE;
     busyIterating = FALSE;
 
+    bit1check = FALSE;
+    bit2check = FALSE;
+    total = 10;
+
     call RadioControl.start();
     call SerialControl.start();
 
     count = 0;
   }
-
-
 
   event void RadioControl.startDone(error_t err) {
     if (err != SUCCESS) {
@@ -216,6 +227,53 @@ implementation {
           ai = ai + aj;
           aj = ai - aj;
           ai = ai - aj;
+        }
+      }
+    }
+  }
+
+  uint32_t newQuickSort(uint16_t lo, uint16_t hi) {
+    mleft = lo;
+    mright = hi;
+    while(1) {
+      lo = mleft;
+      hi = mright;
+      x = Data[mright];
+      while(mleft < mright) {
+        while(mleft < mright && Data[mleft] <= x) {
+          mleft++;
+        }
+        if (mleft < mright) {
+          Data[mright] = Data[mleft];
+        }
+        while(mleft < mright && Data[mright] >= x) {
+          mright--;
+        }
+        if (mleft < mright) {
+          Data[mleft] = Data[mright];
+        }
+      }
+      Data[mright] = x;
+      if (mright == (total / 2)) {
+        bit1check = TRUE;
+        bit1 = Data[mright];
+      }
+      else if (mright == (total / 2 + 1)) {
+        bit2check = TRUE;
+        bit2 = Data[mright];
+      }
+
+      if (bit1check && bit2check) {
+        return (bit1 + bit2) / 2;
+      }
+      else {
+        if (mleft <= (total / 2)) {
+          mleft++;
+          mright = hi;
+        }
+        else if (mright >= (total / 2 + 1)) {
+          mright--;
+          mleft = lo;
         }
       }
     }
