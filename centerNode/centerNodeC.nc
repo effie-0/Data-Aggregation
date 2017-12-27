@@ -242,7 +242,12 @@ implementation {
   }
 
   void AskForData() {
-    // printf("AskForData\n");
+    printf("AskForData\n");
+    if (queue_head != queue_tail) {
+      // haven't finished asking
+      return;
+    }
+
     queue_head = 0;
     queue_tail = 0;
     for(i = MIN_PCK_NUM; i <= MAX_PCK_NUM; i++) {
@@ -265,7 +270,9 @@ implementation {
         printf("%ld\n", Data[AskQueue[queue_tail - 1].seqnum]);
       }
       printf("queue_tail: %u, seqnum: %u\n", queue_tail, AskQueue[queue_tail-1].seqnum);
-      sendAskMessage();
+      if (!busy) {
+        sendAskMessage();
+      }
     }
   }
 
@@ -297,27 +304,33 @@ implementation {
     // debug
     // printf("Received message\n");
 
-    //if (count % 100 == 0) {
-    //  call Leds.led0Toggle();
-    //}
+    if (count % 100 == 0) {
+     call Leds.led2Toggle();
+    }
     count += 1;
+    if (askStart && count % 500 == 0) {
+      AskForData();
+    }
 
     if (len == sizeof(SeqMsg)) {
       rcvPck = (SeqMsg*)payload;
       if (Data[rcvPck->sequence_number] == -1) {
         Data[rcvPck->sequence_number] = rcvPck->random_integer;
         // debug
-        // if (askStart) {
-          // printf("Received SeqMsg, sequence number: %u\n", rcvPck->sequence_number);
-        // }
-        if (rcvPck->sequence_number % 100 == 0) {
-          call Leds.led2Toggle();
+        // printf("new seq: %u, int: %ld\n", rcvPck->sequence_number, rcvPck->random_integer);
+        // debug
+        printf("received seq: %u, int: %ld\n", rcvPck->sequence_number, rcvPck->random_integer);
+        if (askStart) {
+          printf("SeqMsg, seq: %u\n", rcvPck->sequence_number);
         }
+        // if (rcvPck->sequence_number % 100 == 0) {
+        //   call Leds.led2Toggle();
+        // }
       }
       if (rcvPck->sequence_number == MAX_PCK_NUM) {
         if (!askStart) {
           askStart = TRUE;
-          AskForData();
+          // AskForData();
           call dataTimer.startPeriodic(ASK_PERIOD);
         }
       }
@@ -331,7 +344,7 @@ implementation {
           // debug
           // printf("ask for data\n");
           askStart = TRUE;
-          AskForData();
+          // AskForData();
           call dataTimer.startPeriodic(ASK_PERIOD);
         }
       }
@@ -363,17 +376,16 @@ implementation {
     // debug
     // printf("dataTimer.fired\n");
     call dataTimer.stop();
+    if (collectFinished) {
+      return;
+    }
     if (queue_head != queue_tail) {
+      // debug
+      printf("head: %u, tail: %u\n", queue_head, queue_tail);
       call dataTimer.startPeriodic(ASK_PERIOD);
       return;
     }
-
     AskForData();
-    if (!collectFinished) {
-      call dataTimer.startPeriodic(ASK_PERIOD);
-      //debug
-      // printf("start periodic\n");
-    }
   }
 
   // event message_t* SReceive.receive(message_t* msg, void* payload, uint8_t len) {
