@@ -150,6 +150,7 @@ implementation {
       sndPck->groupid = result.groupid;
       sndPck->max = result.max;
       sndPck->min = result.min;
+      sndPck->sum = result.sum;
       sndPck->average = result.average;
       sndPck->median = result.median;
       if(call AMSend.send(AM_BROADCAST_ADDR, &resultpkt, sizeof(NodeMsg)) == SUCCESS) {
@@ -227,6 +228,7 @@ implementation {
 
   void bubbleSort(uint16_t lo, uint16_t hi) {
     uint16_t ai, aj;
+    uint16_t flag;
     for (ai = lo; ai < hi; ai++) {
       for (aj = ai + 1; aj <= hi; aj++) {
         if (Data[ai] > Data[aj]) {
