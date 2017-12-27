@@ -3,3 +3,4 @@ sensorNode/build/
 centerNode/build/
 TestSender/build/
 *.class
+sensorNode/FinishReceive.h
