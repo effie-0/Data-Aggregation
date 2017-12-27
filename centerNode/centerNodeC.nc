@@ -7,7 +7,7 @@
 
 #define MAX_PCK_NUM 2000
 #define MIN_PCK_NUM 1
-#define MY_QUEUE_SIZE 200
+#define MY_QUEUE_SIZE 20
 #define GROUP_ID 18
 #define ROOT_NODE 0
 #define TIMEOUT_PERIOD 5000
@@ -61,12 +61,16 @@ implementation {
   uint16_t count;
 
   event void Boot.booted() {
+    uint16_t j;
+
     for(i = 0; i <= MAX_PCK_NUM; i++) {
       Data[i] = -1;
     }
     for(i = 0; i < MY_QUEUE_SIZE; i++) {
       AskQueue[i].groupid = GROUP_ID;
-      AskQueue[i].seqnum = 0;
+      for(j = 0; j < SEQ_SIZE; j++) {
+        AskQueue[i].seqnum[j] = -1;
+      }
     }
     queue_head = 0;
     queue_tail = 0;
@@ -90,9 +94,6 @@ implementation {
     call SerialControl.start();
 
     count = 0;
-
-    // debug
-    // printf("init\n");
   }
 
 
@@ -116,14 +117,18 @@ implementation {
 
   void sendAskMessage() {
     AskMsg* askPck;
-    // printf("sendAskMessage\n");
+    uint16_t j;
+
     if (queue_head != queue_tail) {
       askPck = (AskMsg*)(call Packet.getPayload(&askpkt, sizeof(AskMsg)));
       if (askPck == NULL) {
         return;
       }
       askPck->groupid = AskQueue[queue_head].groupid;
-      askPck->seqnum = AskQueue[queue_head].seqnum;
+      for(j = 0; j < SEQ_SIZE; j++) {
+        askPck->seqnum[j] = AskQueue[queue_head].seqnum[j];
+      }
+
       if(call AMSend.send(AM_BROADCAST_ADDR, &askpkt, sizeof(AskMsg)) == SUCCESS) {
         // debug
         //printf("Sent ask message, sequence number: %u\n", askPck->seqnum);
@@ -141,7 +146,7 @@ implementation {
 
   void sendResultMessage() {
     NodeMsg* sndPck;
-    // printf("sendResultMessage\n");
+
     if (calFinished && !sndFinished) {
       sndPck = (NodeMsg*)(call Packet.getPayload(&resultpkt, sizeof(NodeMsg)));
       if (sndPck == NULL) {
@@ -167,29 +172,6 @@ implementation {
     }
 
   }
-
-  // void s_sendMessage() {
-  //   NodeMsg* sndPck;
-  //   if (calFinished && !sndFinished) {
-  //     sndPck = (NodeMsg*)(call SPacket.getPayload(&spkt, sizeof(NodeMsg)));
-  //     if (sndPck == NULL) {
-  //       return;
-  //     }
-  //     sndPck->groupid = result.groupid;
-  //     sndPck->max = result.max;
-  //     sndPck->min = result.min;
-  //     sndPck->average = result.average;
-  //     sndPck->median = result.median;
-  //     if(call SAMSend.send(AM_BROADCAST_ADDR, &spkt, sizeof(NodeMsg)) == SUCCESS) {
-  //       Sbusy = TRUE;
-  //       call Leds.led1On();
-  //     }
-  //   }
-  //   else {
-  //     Sbusy = FALSE;
-  //     call Leds.led1Off();
-  //   }
-  // }
 
   uint16_t Partition(uint16_t lo, uint16_t hi) {
     uint32_t x;
@@ -289,6 +271,7 @@ implementation {
   }
 
   void AskForData() {
+    uint16_t j;
     //printf("AskForData\n");
     if (queue_head != queue_tail) {
       // haven't finished asking
@@ -298,11 +281,19 @@ implementation {
     queue_head = 0;
     queue_tail = 0;
     busyIterating = TRUE;
+    j = 0;
     for(i = MIN_PCK_NUM; i <= MAX_PCK_NUM; i++) {
       if (Data[i] == -1 && queue_tail != MY_QUEUE_SIZE) {
-        AskQueue[queue_tail].seqnum = i;
-        queue_tail += 1;
+        AskQueue[queue_tail].seqnum[j] = i;
+        j += 1;
+        if (j >= SEQ_SIZE) {
+          queue_tail += 1;
+          j = 0;
+        }
       }
+    }
+    if (j != 0) {
+      queue_tail += 1;
     }
     busyIterating = FALSE;
 
@@ -439,8 +430,6 @@ implementation {
   }
 
   event void dataTimer.fired() {
-    // debug
-    // printf("dataTimer.fired\n");
     call dataTimer.stop();
     if (collectFinished) {
       return;
@@ -454,8 +443,4 @@ implementation {
     AskForData();
   }
 
-  // event message_t* SReceive.receive(message_t* msg, void* payload, uint8_t len) {
-  //   // do nothing
-  //   return msg;
-  // }
 }
