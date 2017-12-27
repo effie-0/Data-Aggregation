@@ -10,7 +10,7 @@ public class NodeMsg extends net.tinyos.message.Message {
     public static final int DEFAULT_MESSAGE_SIZE = 21;
 
     /** The Active Message type associated with this message. */
-    public static final int AM_TYPE = 6;
+    public static final int AM_TYPE = 0;
 
     /** Create a new NodeMsg of size 21. */
     public NodeMsg() {
