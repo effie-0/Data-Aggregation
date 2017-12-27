@@ -4,7 +4,6 @@
 
 enum
 {
-	AM_NODEMSG = 6,
 	AM_DATA_PACKGE = 10,
 	AM_CALCULATE_RESULT = 10
 };

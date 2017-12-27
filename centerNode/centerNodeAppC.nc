@@ -1,3 +1,4 @@
+#include "printf.h"
 #include "./NodeMessage.h"
 
 configuration centerNodeAppC 
@@ -14,6 +15,7 @@ implementation {
   components ActiveMessageC;
   // components SerialActiveMessageC;
   components PrintfC;
+  components SerialStartC;
 
   App.Boot -> MainC.Boot;
   App.Leds -> LedsC.Leds;

@@ -10,6 +10,6 @@ typedef nx_struct NodeMsg {
   nx_uint32_t median;
 } NodeMsg;
 
-enum { AM_NODEMSG = 6 };
+enum { AM_NODEMSG = 12 };
 
 #endif MESSAGE_H

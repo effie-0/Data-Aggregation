@@ -1,9 +1,9 @@
+#include "printf.h"
 #include "NodeMessage.h"
 #include "AskMsg.h"
 #include "ACKMsg.h"
 #include "../sensorNode/SeqMsg.h"
 #include "../sensorNode/FinishReceive.h"
-#include "printf.h"
 
 #define MAX_PCK_NUM 2000
 #define MIN_PCK_NUM 1
@@ -122,6 +122,8 @@ implementation {
       askPck->groupid = AskQueue[queue_head].groupid;
       askPck->seqnum = AskQueue[queue_head].seqnum;
       if(call AMSend.send(AM_BROADCAST_ADDR, &askpkt, sizeof(AskMsg)) == SUCCESS) {
+        // debug
+        printf("Sent ask message, sequence number: %u\n", askPck->seqnum);
         busy = TRUE;
         call Leds.led1Toggle();
       }
@@ -278,7 +280,7 @@ implementation {
     ACKMsg* ackPck;
 
     // debug
-    printf("Received message\n");
+    // printf("Received message\n");
 
     if (count % 100 == 0) {
       call Leds.led0Toggle();
@@ -287,6 +289,8 @@ implementation {
 
     if (len == sizeof(SeqMsg)) {
       rcvPck = (SeqMsg*)payload;
+      // debug
+      printf("Received SeqMsg, sequence number: %u, random integer: %ld\n", rcvPck->sequence_number, rcvPck->random_integer);
       if (Data[rcvPck->sequence_number] == -1) {
         Data[rcvPck->sequence_number] = rcvPck->random_integer;
         if (rcvPck->sequence_number % 100 == 0) {
@@ -302,9 +306,13 @@ implementation {
       }
     }
     else if (len == sizeof(FinishReceive)) {
+      // debug
+      printf("Received FinishReceive\n");
       frPck = (FinishReceive*)payload;
       if (frPck->groupid == GROUP_ID) {
         if (!askStart) {
+          // debug
+          printf("ask for data\n");
           askStart = TRUE;
           AskForData();
           call dataTimer.startPeriodic(ASK_PERIOD);
@@ -314,6 +322,8 @@ implementation {
     else if (len == sizeof(ACKMsg)) {
       ackPck = (ACKMsg*)payload;
       if (ackPck->group_id == GROUP_ID) {
+        // debug
+        printf("received ACKMsg\n");
         sndFinished = TRUE;
         call sendTimer.stop();
         call Leds.led0On();

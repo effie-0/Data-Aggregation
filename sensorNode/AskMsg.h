@@ -6,6 +6,4 @@ typedef nx_struct AskMsg {
   nx_uint16_t seqnum;
 } AskMsg;
 
-enum { AM_ASKMSG = 6 };
-
 #endif

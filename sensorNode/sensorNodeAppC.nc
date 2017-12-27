@@ -1,4 +1,5 @@
-#include "./NodeMessage.h"
+#include "printf.h"
+#include "../centerNode/NodeMessage.h"
 configuration sensorNodeAppC {}
 implementation {
 	components sensorNodeC as App;
@@ -6,6 +7,8 @@ implementation {
 	components new AMSenderC(AM_NODEMSG);
     components new AMReceiverC(AM_NODEMSG);
 	components ActiveMessageC;
+	components PrintfC;
+    components SerialStartC;
 
 	App.Boot -> MainC;
 	App.Leds -> LedsC;

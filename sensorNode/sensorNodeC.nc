@@ -1,8 +1,9 @@
+#include "printf.h"
 #include "SeqMsg.h"
 #include "AskMsg.h"
 #include "FinishReceive.h"
 
-#define MAX_INTEGER_NUM 1000
+#define MAX_INTEGER_NUM 2000
 #define MAX_ASK_MSG_NUM 500
 #define ROOT_NODE 0
 #define GROUP_ID 18
@@ -25,8 +26,8 @@ implementation {
 	uint16_t PICK_PERIOD;
 
 	message_t pkt;
-	SeqMsg MsgQueue[MAX_INTEGER_NUM];
-	uint32_t AskedSequenceNumbersQueue[MAX_ASK_MSG_NUM];
+	uint32_t randomIntegers[MAX_INTEGER_NUM];
+	uint16_t AskedSequenceNumbersQueue[MAX_ASK_MSG_NUM];
 	uint16_t queue_head;
 	uint16_t queue_tail;
 	uint16_t sentFinishReceive;
@@ -39,8 +40,7 @@ implementation {
 
 	event void Boot.booted() {
 		for (i = 0;i < MAX_INTEGER_NUM;i++) {
-			MsgQueue[i].sequence_number = -1;
-			MsgQueue[i].random_integer = -1;
+			randomIntegers[i] = -1;
 		}
 		for (i = 0;i < MAX_ASK_MSG_NUM;i++) {
 			AskedSequenceNumbersQueue[i] = -1;
@@ -48,6 +48,7 @@ implementation {
 		queue_head = 0;
 		queue_tail = 0;
 		sentFinishReceive = 0;
+		busy = FALSE;
 
 		call RadioControl.start();
 
@@ -71,10 +72,12 @@ implementation {
 		}
 		sndPck = (SeqMsg*)(call Packet.getPayload(&pkt, sizeof(SeqMsg)));
 		askedSequenceNumber = AskedSequenceNumbersQueue[queue_head];
-		sndPck->sequence_number = MsgQueue[askedSequenceNumber - 1].sequence_number;
-		sndPck->random_integer = MsgQueue[askedSequenceNumber - 1].random_integer;
+		sndPck->sequence_number = askedSequenceNumber;
+		sndPck->random_integer = randomIntegers[askedSequenceNumber - 1];
 			
 		if (call AMSend.send(AM_BROADCAST_ADDR, &pkt, sizeof(SeqMsg)) == SUCCESS) {
+			// debug
+			printf("Sent SeqMsg. Sequence number: %u, random integer: %ld", sndPck->sequence_number, sndPck->random_integer);
 			busy = TRUE;
 			call Leds.led1Toggle();
 		}
@@ -83,6 +86,8 @@ implementation {
 	event void AMSend.sendDone(message_t* m, error_t err) {
 		busy = FALSE;
 		if (sentFinishReceive == 0) {
+			// debug
+			printf("Sent finish receive\n");
 			sentFinishReceive = 1;
 			return;
 		}
@@ -106,11 +111,13 @@ implementation {
 		// rcvPck = (NodeMsg*)payload;
 		if(len == sizeof(SeqMsg)) {
 			seqMsgRcvPck = (SeqMsg*)payload;
-			if (seqMsgRcvPck->sequence_number > 0 && seqMsgRcvPck->sequence_number <= MAX_INTEGER_NUM) {
-				MsgQueue[seqMsgRcvPck->sequence_number - 1].sequence_number = seqMsgRcvPck->sequence_number;
-			    MsgQueue[seqMsgRcvPck->sequence_number - 1].random_integer = seqMsgRcvPck->random_integer;
-			    if(seqMsgRcvPck->sequence_number == MAX_INTEGER_NUM) {
-				    while(busy) {}
+			// debug
+			printf("Received SeqMsg. Sequence number: %u, random integer: %ld\n", seqMsgRcvPck->sequence_number, seqMsgRcvPck->random_integer);
+			if (seqMsgRcvPck->sequence_number > 0 && seqMsgRcvPck->sequence_number <= MAX_INTEGER_NUM && randomIntegers[seqMsgRcvPck->sequence_number - 1] != seqMsgRcvPck->random_integer) {
+				// debug
+				printf("Received valid SeqMsg. Sequence number: %u, random integer: %ld\n", seqMsgRcvPck->sequence_number, seqMsgRcvPck->random_integer);
+			    randomIntegers[seqMsgRcvPck->sequence_number - 1] = seqMsgRcvPck->random_integer;
+			    if(seqMsgRcvPck->sequence_number == MAX_INTEGER_NUM && !busy) {
 		            sndPck = (FinishReceive*)(call Packet.getPayload(&pkt, sizeof(FinishReceive)));
 			        sndPck->groupid = GROUP_ID * 3 + TOS_NODE_ID;
 			        sndPck->finishSeqNum = MAX_INTEGER_NUM;
@@ -122,7 +129,12 @@ implementation {
 			}
 		} else if(len == sizeof(AskMsg)) {
 			askMsgRcvPck = (AskMsg*)payload;
-			if (askMsgRcvPck->seqnum > 0 && askMsgRcvPck->seqnum <= MAX_INTEGER_NUM && MsgQueue[askMsgRcvPck->seqnum - 1].sequence_number != -1) {
+			// debug
+			printf("Received AskMsg. Sequence number: %u", askMsgRcvPck->seqnum);
+			if (askMsgRcvPck->seqnum > 0 && askMsgRcvPck->seqnum <= MAX_INTEGER_NUM && randomIntegers[askMsgRcvPck->seqnum - 1] != -1) {
+				// debug
+				printf("Received AskMsg and the asked sequence number %u is recorded.\n", askMsgRcvPck->seqnum);
+				call Leds.led2Toggle();
 				AskedSequenceNumbersQueue[queue_tail] = askMsgRcvPck->seqnum;
 			    queue_tail = (queue_tail + 1) % MAX_ASK_MSG_NUM;
 			    if (!busy) {

@@ -1,5 +1,6 @@
 
 #include "./Calculate.h"
+#include "../centerNode/NodeMessage.h"
 
 configuration RandomSenderC
 {
