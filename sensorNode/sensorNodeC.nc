@@ -77,7 +77,7 @@ implementation {
 			
 		if (call AMSend.send(AM_BROADCAST_ADDR, &pkt, sizeof(SeqMsg)) == SUCCESS) {
 			// debug
-			printf("Sent SeqMsg. Sequence number: %u, random integer: %ld", sndPck->sequence_number, sndPck->random_integer);
+			printf("Sent SeqMsg. seq: %u, int: %ld\n", sndPck->sequence_number, sndPck->random_integer);
 			busy = TRUE;
 			call Leds.led1Toggle();
 		}
@@ -112,15 +112,16 @@ implementation {
 		if(len == sizeof(SeqMsg)) {
 			seqMsgRcvPck = (SeqMsg*)payload;
 			// debug
-			printf("Received SeqMsg. Sequence number: %u, random integer: %ld\n", seqMsgRcvPck->sequence_number, seqMsgRcvPck->random_integer);
+			// printf("Received SeqMsg. Sequence number: %u, random integer: %ld\n", seqMsgRcvPck->sequence_number, seqMsgRcvPck->random_integer);
 			if (seqMsgRcvPck->sequence_number > 0 && seqMsgRcvPck->sequence_number <= MAX_INTEGER_NUM && randomIntegers[seqMsgRcvPck->sequence_number - 1] != seqMsgRcvPck->random_integer) {
 				// debug
-				printf("Received valid SeqMsg. Sequence number: %u, random integer: %ld\n", seqMsgRcvPck->sequence_number, seqMsgRcvPck->random_integer);
+				// printf("Received valid SeqMsg. Sequence number: %u, random integer: %ld\n", seqMsgRcvPck->sequence_number, seqMsgRcvPck->random_integer);
 			    randomIntegers[seqMsgRcvPck->sequence_number - 1] = seqMsgRcvPck->random_integer;
 			    if(seqMsgRcvPck->sequence_number == MAX_INTEGER_NUM && !busy) {
 		            sndPck = (FinishReceive*)(call Packet.getPayload(&pkt, sizeof(FinishReceive)));
 			        sndPck->groupid = GROUP_ID * 3 + TOS_NODE_ID;
 			        sndPck->finishSeqNum = MAX_INTEGER_NUM;
+			        sentFinishReceive = 0;
 				    if (call AMSend.send(AM_BROADCAST_ADDR, &pkt, sizeof(FinishReceive)) == SUCCESS) {
 			            busy = TRUE;
 			            call Leds.led1Toggle();
@@ -130,10 +131,11 @@ implementation {
 		} else if(len == sizeof(AskMsg)) {
 			askMsgRcvPck = (AskMsg*)payload;
 			// debug
-			printf("Received AskMsg. Sequence number: %u", askMsgRcvPck->seqnum);
+			// printf("Received AskMsg. Sequence number: %u\n", askMsgRcvPck->seqnum);
+			// printf("randomIntegers[askMsgRcvPck->seqnum - 1]: %u\n", randomIntegers[askMsgRcvPck->seqnum - 1]);
 			if (askMsgRcvPck->seqnum > 0 && askMsgRcvPck->seqnum <= MAX_INTEGER_NUM && randomIntegers[askMsgRcvPck->seqnum - 1] != -1) {
 				// debug
-				printf("Received AskMsg and the asked sequence number %u is recorded.\n", askMsgRcvPck->seqnum);
+				printf("Asked seq %u is recorded.\n", askMsgRcvPck->seqnum);
 				call Leds.led2Toggle();
 				AskedSequenceNumbersQueue[queue_tail] = askMsgRcvPck->seqnum;
 			    queue_tail = (queue_tail + 1) % MAX_ASK_MSG_NUM;
