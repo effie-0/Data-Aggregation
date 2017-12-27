@@ -3,7 +3,6 @@
 #include "AskMsg.h"
 #include "ACKMsg.h"
 #include "../sensorNode/SeqMsg.h"
-#include "../sensorNode/FinishReceive.h"
 
 #define MAX_PCK_NUM 2000
 #define MIN_PCK_NUM 1
@@ -343,7 +342,6 @@ implementation {
 
   event message_t* Receive.receive(message_t* msg, void* payload, uint8_t len) {
     SeqMsg* rcvPck;
-    FinishReceive* frPck;
     ACKMsg* ackPck;
     // debug
     // printf("Received message\n");
@@ -354,10 +352,10 @@ implementation {
     if (count % 100 == 0) {
      call Leds.led2Toggle();
     }
-    if (count % 500 == 0 && askStart) {
-      AskForData();
-      return msg;
-    }
+    // if (count % 500 == 0 && askStart) {
+    //   AskForData();
+    //   return msg;
+    // }
 
     if (len == sizeof(SeqMsg)) {
       rcvPck = (SeqMsg*)payload;
@@ -372,37 +370,12 @@ implementation {
       */
       if (Data[rcvPck->sequence_number] == -1) {
         Data[rcvPck->sequence_number] = rcvPck->random_integer;
-        // debug
-        // printf("new seq: %u, int: %ld\n", rcvPck->sequence_number, rcvPck->random_integer);
-        // debug
-        // printf("received seq: %u, int: %ld\n", rcvPck->sequence_number, rcvPck->random_integer);
-        // if (askStart) {
-        //   printf("SeqMsg, seq: %u\n", rcvPck->sequence_number);
-        // }
-        // if (rcvPck->sequence_number % 100 == 0) {
-        //   call Leds.led2Toggle();
-        // }
-
       }
       if (rcvPck->sequence_number == MAX_PCK_NUM) {
         if (!askStart) {
           askStart = TRUE;
-          // AskForData();
-          // call dataTimer.startPeriodic(ASK_PERIOD);
-        }
-      }
-    }
-    else if (len == sizeof(FinishReceive)) {
-      // debug
-      // printf("Received FinishReceive\n");
-      frPck = (FinishReceive*)payload;
-      if (frPck->groupid == GROUP_ID) {
-        if (!askStart) {
-          // debug
-          // printf("ask for data\n");
-          askStart = TRUE;
-          // AskForData();
-          // call dataTimer.startPeriodic(ASK_PERIOD);
+          AskForData();
+          call dataTimer.startPeriodic(ASK_PERIOD);
         }
       }
     }
