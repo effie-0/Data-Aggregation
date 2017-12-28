@@ -86,7 +86,7 @@ implementation {
 
     result.groupid = GROUP_ID;
     result.max = 0;
-    result.min = 0;
+    result.min = -1;
     result.sum = 0;
     result.average = 0;
     result.median = 0;
@@ -282,6 +282,7 @@ implementation {
   }
 
   void Calculate() {
+    uint16_t j;
     uint16_t mi;
     uint32_t median;
     NodeMsg* debugPCK;
@@ -303,16 +304,30 @@ implementation {
       //Sbusy = TRUE;
     //}
     //QuickSort(MIN_PCK_NUM, MAX_PCK_NUM);
-    median = newQuickSort(uint16_t lo, uint16_t hi);
-    // call Leds.led0Off();
-    result.max = Data[MAX_PCK_NUM];
-    result.min = Data[MIN_PCK_NUM];
+    //bubbleSort(uint16_t lo, uint16_t hi);
+    median = newQuickSort(MIN_PCK_NUM, MAX_PCK_NUM);
     result.sum = 0;
-    for(i = MIN_PCK_NUM; i <= MAX_PCK_NUM; i++) {
-      result.sum += Data[i];
+    for(j = MIN_PCK_NUM; j <= MAX_PCK_NUM; j++) {
+      if (Data[j] > result.max) {
+        result.max = Data[j];
+      }
+      if (result.min == -1) {
+        result.min = Data[j];
+      }
+      else if (result.min > Data[j]) {
+        result.min = Data[j];
+      }
+      result.sum += Data[j];
     }
+    // call Leds.led0Off();
+    // result.max = Data[MAX_PCK_NUM];
+    // result.min = Data[MIN_PCK_NUM];
+    // result.sum = 0;
+    // for(i = MIN_PCK_NUM; i <= MAX_PCK_NUM; i++) {
+    //   result.sum += Data[i];
+    // }
     result.average = result.sum / (MAX_PCK_NUM - MIN_PCK_NUM + 1);
-    result.median = Data[mi];
+    result.median = median;
 
     calFinished = TRUE;
     sendResultMessage();
@@ -382,6 +397,7 @@ implementation {
   }
 
   event void AMSend.sendDone(message_t* msg, error_t err) {
+    uint16_t j;
     // debug
     // printf("sendDone\n");
     busy = FALSE;
@@ -389,6 +405,9 @@ implementation {
       //call Leds.led1Off();
     }
     else {
+      for(j = 0; j < SEQ_SIZE; j++) {
+        AskQueue[queue_head].seqnum[j] = -1;
+      }
       queue_head += 1;
       if ((queue_head != queue_tail) && (!busy)) {
         sendAskMessage();
