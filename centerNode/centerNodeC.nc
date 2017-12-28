@@ -283,6 +283,7 @@ implementation {
 
   void Calculate() {
     uint16_t mi;
+    uint32_t median;
     NodeMsg* debugPCK;
     debugPCK = (NodeMsg*)(call SPacket.getPayload(&debugpkt, sizeof(NodeMsg)));
 
@@ -302,7 +303,7 @@ implementation {
       //Sbusy = TRUE;
     //}
     //QuickSort(MIN_PCK_NUM, MAX_PCK_NUM);
-    bubbleSort(MIN_PCK_NUM, MAX_PCK_NUM);
+    median = newQuickSort(uint16_t lo, uint16_t hi);
     // call Leds.led0Off();
     result.max = Data[MAX_PCK_NUM];
     result.min = Data[MIN_PCK_NUM];
