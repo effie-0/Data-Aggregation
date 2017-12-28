@@ -101,7 +101,7 @@ implementation {
 
     bit1check = FALSE;
     bit2check = FALSE;
-    total = 10;
+    total = 2000;
 
     call RadioControl.start();
     call SerialControl.start();
@@ -175,7 +175,7 @@ implementation {
       if(call AMSend.send(AM_BROADCAST_ADDR, &resultpkt, sizeof(NodeMsg)) == SUCCESS) {
         // debug
         // printf("Sent result message.\n");
-        // call Leds.led1On();
+        call Leds.led1On();
         busy = TRUE;
         //call Leds.led1On();
       }
@@ -287,10 +287,10 @@ implementation {
     uint16_t j;
     uint16_t mi;
     uint32_t median;
-    call Leds.led0On();
     NodeMsg* debugPCK;
     debugPCK = (NodeMsg*)(call SPacket.getPayload(&debugpkt, sizeof(NodeMsg)));
 
+    call Leds.led0On();
     // call Leds.led0On();
     // printf("Calculate\n");
     mi = (MIN_PCK_NUM + MAX_PCK_NUM) / 2;
@@ -455,6 +455,10 @@ implementation {
       if (Data[rcvPck->sequence_number] == -1) {
         validIndex += 1;
         Data[rcvPck->sequence_number] = rcvPck->random_integer;
+        if (validIndex == 2000 && !collectFinished) {
+          collectFinished = TRUE; // All data collected
+          Calculate();
+        }
       }
       if (validIndex > 1800 || rcvPck->sequence_number == MAX_PCK_NUM) {
         if (!askStart) {
