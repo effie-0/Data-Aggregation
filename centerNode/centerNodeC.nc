@@ -33,7 +33,6 @@ module centerNodeC {
 implementation {
   // status
   bool busy;
-  bool busyIterating;
   bool Sbusy; // debug
   bool calFinished; // finish computation
   bool sndFinished; // finished whole result send and got ACK
@@ -96,7 +95,6 @@ implementation {
     sndFinished = FALSE;
     collectFinished = FALSE;
     askStart = FALSE;
-    busyIterating = FALSE;
 
     bit1check = FALSE;
     bit2check = FALSE;
@@ -142,6 +140,7 @@ implementation {
       if(call AMSend.send(AM_BROADCAST_ADDR, &askpkt, sizeof(AskMsg)) == SUCCESS) {
         // debug
         //printf("Sent ask message, sequence number: %u\n", askPck->seqnum);
+        call Leds.led0Toggle();
         busy = TRUE;
         //call Leds.led1Toggle();
       }
@@ -171,7 +170,7 @@ implementation {
       if(call AMSend.send(AM_BROADCAST_ADDR, &resultpkt, sizeof(NodeMsg)) == SUCCESS) {
         // debug
         // printf("Sent result message.\n");
-        call Leds.led1On();
+        // call Leds.led1On();
         busy = TRUE;
         //call Leds.led1On();
       }
@@ -285,7 +284,7 @@ implementation {
     debugPCK = (NodeMsg*)(call SPacket.getPayload(&debugpkt, sizeof(NodeMsg)));
 
 
-    call Leds.led0On();
+    // call Leds.led0On();
     // printf("Calculate\n");
     mi = (MIN_PCK_NUM + MAX_PCK_NUM) / 2;
     //debugPCK->groupid = GROUP_ID;
@@ -301,7 +300,7 @@ implementation {
     //}
     //QuickSort(MIN_PCK_NUM, MAX_PCK_NUM);
     bubbleSort(MIN_PCK_NUM, MAX_PCK_NUM);
-    call Leds.led0Off();
+    // call Leds.led0Off();
     result.max = Data[MAX_PCK_NUM];
     result.min = Data[MIN_PCK_NUM];
     result.sum = 0;
@@ -322,13 +321,15 @@ implementation {
     debugPCK->median = result.median;
     //if (!Sbusy) {
       call SAMSend.send(AM_BROADCAST_ADDR, &debugpkt, sizeof(NodeMsg));
-      call Leds.led0On();
+      // call Leds.led0On();
     // s_sendMessage(); // debug
     call sendTimer.startPeriodic(TIMEOUT_PERIOD);
   }
 
   void AskForData() {
     uint16_t j;
+    // debug
+    // call Leds.led1Toggle();
     //printf("AskForData\n");
     if (queue_head != queue_tail) {
       // haven't finished asking
@@ -337,7 +338,6 @@ implementation {
 
     queue_head = 0;
     queue_tail = 0;
-    busyIterating = TRUE;
     j = 0;
     for(i = MIN_PCK_NUM; i <= MAX_PCK_NUM; i++) {
       if (Data[i] == -1 && queue_tail != MY_QUEUE_SIZE) {
@@ -352,7 +352,6 @@ implementation {
     if (j != 0) {
       queue_tail += 1;
     }
-    busyIterating = FALSE;
 
     if (queue_head == queue_tail) {
       //printf("queue_head == queue_tail\n");
@@ -375,7 +374,7 @@ implementation {
 
   event void SAMSend.sendDone(message_t* msg, error_t err) {
     Sbusy = FALSE;
-    call Leds.led0Off();
+    // call Leds.led0Off();
   }
 
   event void AMSend.sendDone(message_t* msg, error_t err) {
@@ -404,9 +403,6 @@ implementation {
     // debug
     // printf("Received message\n");
     count += 1;
-    if (busyIterating) {
-      return msg;
-    }
     if (count % 100 == 0) {
      call Leds.led2Toggle();
     }
@@ -417,6 +413,8 @@ implementation {
 
     if (len == sizeof(SeqMsg)) {
       rcvPck = (SeqMsg*)payload;
+      // debug
+      // printf("SeqMsg, seq: %u, int: %ld", rcvPck->sequence_number, rcvPck->random_integer);
       /*
       debugPCK->max = rcvPck->sequence_number;
       debugPCK->min = rcvPck->random_integer;
@@ -431,6 +429,8 @@ implementation {
       }
       if (rcvPck->sequence_number == MAX_PCK_NUM) {
         if (!askStart) {
+          // debug
+          call Leds.led1Toggle();
           askStart = TRUE;
           AskForData();
           call dataTimer.startPeriodic(ASK_PERIOD);
