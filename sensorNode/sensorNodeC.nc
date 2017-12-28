@@ -1,9 +1,8 @@
-#include "printf.h"
 #include "SeqMsg.h"
 #include "../centerNode/AskMsg.h"
 // #include "FinishReceive.h"
 
-#define MAX_INTEGER_NUM 2000
+#define MAX_INTEGER_NUM 2005
 #define MAX_ASK_MSG_NUM 500
 #define ROOT_NODE 1
 #define GROUP_ID 18
@@ -21,7 +20,6 @@ module sensorNodeC {
 implementation {
 	// status
 	bool busy;
-	bool retransmitting;
 	// bool sendingFinishMsg;
 	uint16_t base;
 
@@ -29,10 +27,10 @@ implementation {
 
 	message_t pkt;
 	uint32_t randomIntegers[MAX_INTEGER_NUM];
-	uint16_t AskedSequenceNumbersQueue[MAX_ASK_MSG_NUM];
+	uint16_t count;
 	uint16_t queue_head;
 	uint16_t queue_tail;
-	uint16_t count;
+	SeqMsg seqqueue[200];
 
 	// iteration variable
 	uint16_t i;
@@ -40,16 +38,12 @@ implementation {
 	message_t pkt;
 
 	event void Boot.booted() {
-		for (i = 0;i < MAX_INTEGER_NUM;i++) {
-			randomIntegers[i] = -1;
-		}
-		for (i = 0;i < MAX_ASK_MSG_NUM;i++) {
-			AskedSequenceNumbersQueue[i] = -1;
-		}
 		queue_head = 0;
 		queue_tail = 0;
+		for (i = 0;i <= MAX_INTEGER_NUM;i++) {
+			randomIntegers[i] = -1;
+		}
 		busy = FALSE;
-		retransmitting = FALSE;
 		// sendingFinishMsg = FALSE;
 
 		call RadioControl.start();
@@ -68,35 +62,25 @@ implementation {
 
 	void sendMessage() {
 		SeqMsg* sndPck;
-		uint16_t askedSequenceNumber;
-		if (queue_head == queue_tail) {
-			return;
-		}
+		call Leds.led0Toggle();
 		sndPck = (SeqMsg*)(call Packet.getPayload(&pkt, sizeof(SeqMsg)));
-		askedSequenceNumber = AskedSequenceNumbersQueue[queue_head];
-		sndPck->sequence_number = askedSequenceNumber;
-		sndPck->random_integer = randomIntegers[askedSequenceNumber - 1];
+		sndPck->sequence_number = seqqueue[queue_head].sequence_number;
+		sndPck->random_integer = seqqueue[queue_head].random_integer;
 			
 		if (call AMSend.send(AM_BROADCAST_ADDR, &pkt, sizeof(SeqMsg)) == SUCCESS) {
 			// debug
-			// printf("Sent SeqMsg. seq: %u, int: %ld\n", sndPck->sequence_number, sndPck->random_integer);
-			call Leds.led1Toggle();
 			busy = TRUE;
 		}
 	}
 
 	event void AMSend.sendDone(message_t* m, error_t err) {
-		busy = FALSE;
-		if (retransmitting) {
-			retransmitting = FALSE;
+		if (queue_tail == queue_head) {
+			busy = FALSE;
 			return;
-		} 
-		// else if (sendingFinishMsg) {
-		// 	sendingFinishMsg = FALSE;
-		// 	return;
-		// }
-		queue_head = (queue_head + 1) % MAX_ASK_MSG_NUM;
-		if (queue_head != queue_tail) {
+		}
+		else if (queue_head != queue_tail) {
+			queue_head = (queue_head + 1) % 200;
+			busy = TRUE;
 			sendMessage();
 		}
 	}
@@ -106,64 +90,34 @@ implementation {
 		uint16_t dis;
 		SeqMsg *seqMsgRcvPck;
 		AskMsg *askMsgRcvPck;
-		SeqMsg *seqMsgSndPck;
+
+		call Leds.led2Toggle();
 		// FinishReceive *sndPck;
 
-		if (count % 100 == 0) {
-            call Leds.led0Toggle();
-         }
-         count += 1;
-		// rcvPck = (NodeMsg*)payload;
+        count += 1;
 		if(len == sizeof(SeqMsg)) {
 			seqMsgRcvPck = (SeqMsg*)payload;
-			// debug
-			// printf("Received SeqMsg. Sequence number: %u, random integer: %ld\n", seqMsgRcvPck->sequence_number, seqMsgRcvPck->random_integer);
-			if (seqMsgRcvPck->sequence_number > 0 && seqMsgRcvPck->sequence_number <= MAX_INTEGER_NUM && randomIntegers[seqMsgRcvPck->sequence_number - 1] != seqMsgRcvPck->random_integer) {
-				// debug
-				// printf("Received valid SeqMsg. Sequence number: %u, random integer: %ld\n", seqMsgRcvPck->sequence_number, seqMsgRcvPck->random_integer);
-			    randomIntegers[seqMsgRcvPck->sequence_number - 1] = seqMsgRcvPck->random_integer;
-			}
-			// if(seqMsgRcvPck->sequence_number == MAX_INTEGER_NUM && !busy) {
-		 //        sndPck = (FinishReceive*)(call Packet.getPayload(&pkt, sizeof(FinishReceive)));
-			//     sndPck->groupid = GROUP_ID;
-			//     sndPck->finishSeqNum = MAX_INTEGER_NUM;
-			// 	if (call AMSend.send(AM_BROADCAST_ADDR, &pkt, sizeof(FinishReceive)) == SUCCESS) {
-			//         busy = TRUE;
-			//         sendingFinishMsg = TRUE;
-			//         call Leds.led1On();
-		 //        }
-			// } else 
-			if (!busy) {
-			    seqMsgSndPck = (SeqMsg*)(call Packet.getPayload(&pkt, sizeof(SeqMsg)));
-			    seqMsgSndPck->sequence_number = seqMsgRcvPck->sequence_number;
-			    seqMsgSndPck->random_integer = seqMsgRcvPck->random_integer;
-			    if (call AMSend.send(AM_BROADCAST_ADDR, &pkt, sizeof(SeqMsg)) == SUCCESS) {
-			    	retransmitting = TRUE;
-				    busy = TRUE;
-				    // call Leds.led1Toggle();
-			    }
+			if (seqMsgRcvPck->sequence_number > 0 && seqMsgRcvPck->sequence_number <= MAX_INTEGER_NUM) {
+				randomIntegers[seqMsgRcvPck->sequence_number] = seqMsgRcvPck->random_integer;
 			}
 	    } else if(len == sizeof(AskMsg)) {
+	    	call Leds.led1Toggle();
 			askMsgRcvPck = (AskMsg*)payload;
 			// debug
-			// printf("Received AskMsg. Sequence number: %u\n", askMsgRcvPck->seqnum);
-			// printf("randomIntegers[askMsgRcvPck->seqnum - 1]: %u\n", randomIntegers[askMsgRcvPck->seqnum - 1]);
-			if (askMsgRcvPck->groupid == GROUP_ID) {
-				call Leds.led2Toggle();
 				for (i = 0;i < SEQ_SIZE;i++) {
-					if (queue_tail == queue_head - 1) {
-						// queue full
-						break;
+					if ((askMsgRcvPck->seqnum[i] > 0) && (askMsgRcvPck->seqnum[i] <= MAX_INTEGER_NUM) && (randomIntegers[askMsgRcvPck->seqnum[i]] != -1)) {
+						seqqueue[queue_tail].sequence_number = askMsgRcvPck->seqnum[i];
+						seqqueue[queue_tail].random_integer = randomIntegers[askMsgRcvPck->seqnum[i]];
+						queue_tail = (queue_tail + 1) % 200;
+						if (!busy) {
+							busy = TRUE;
+							sendMessage();
+						}
+
 					}
-					if (askMsgRcvPck->seqnum[i] > 0 && askMsgRcvPck->seqnum[i] <= MAX_INTEGER_NUM && randomIntegers[askMsgRcvPck->seqnum[i] - 1] != -1) {
-						AskedSequenceNumbersQueue[queue_tail] = askMsgRcvPck->seqnum[i];
-						queue_tail = (queue_tail + 1) % MAX_ASK_MSG_NUM;
-					}
+					
 				}
-				if (!busy) {
-				    sendMessage();
-			    }
-			}
+			
 		}
 		return msg;
 	}

@@ -175,7 +175,7 @@ implementation {
       if(call AMSend.send(AM_BROADCAST_ADDR, &resultpkt, sizeof(NodeMsg)) == SUCCESS) {
         // debug
         // printf("Sent result message.\n");
-        call Leds.led1On();
+        //call Leds.led1On();
         busy = TRUE;
         //call Leds.led1On();
       }
@@ -290,7 +290,7 @@ implementation {
     NodeMsg* debugPCK;
     debugPCK = (NodeMsg*)(call SPacket.getPayload(&debugpkt, sizeof(NodeMsg)));
 
-    call Leds.led0On();
+    call Leds.led2On();
     // call Leds.led0On();
     // printf("Calculate\n");
     mi = (MIN_PCK_NUM + MAX_PCK_NUM) / 2;
@@ -346,12 +346,13 @@ implementation {
       // call Leds.led0On();
     // s_sendMessage(); // debug
     call sendTimer.startPeriodic(TIMEOUT_PERIOD);
+    call Leds.led2Off();
   }
 
   void AskForData() {
     uint16_t j;
     // debug
-    // call Leds.led1Toggle();
+    call Leds.led1Toggle();
     //printf("AskForData\n");
     if (queue_head != queue_tail) {
       // haven't finished asking
@@ -428,29 +429,32 @@ implementation {
   event message_t* Receive.receive(message_t* msg, void* payload, uint8_t len) {
     SeqMsg* rcvPck;
     ACKMsg* ackPck;
-    NodeMsg* debugPCK;
-    debugPCK = (NodeMsg*)(call SPacket.getPayload(&seqdebugpkt, sizeof(NodeMsg)));
+    //NodeMsg* debugPCK;
+    //debugPCK = (NodeMsg*)(call SPacket.getPayload(&seqdebugpkt, sizeof(NodeMsg)));
     // debug
     // printf("Received message\n");
     count += 1;
-    if (count % 100 == 0) {
-       call Leds.led2Toggle();
-    }
+    //if (count % 100 == 0) {
+       //call Leds.led2Toggle();
+    //}
+    call Leds.led0Toggle();
     // if (count % 500 == 0 && askStart) {
     //   AskForData();
     //   return msg;
     // }
 
     if (len == sizeof(SeqMsg)) {
+      call Leds.led1Toggle();
       rcvPck = (SeqMsg*)payload;
       // debug
-      
-      debugPCK->max = rcvPck->sequence_number;
-      debugPCK->min = rcvPck->random_integer;
-      if (!Sbusy) {
-        call SAMSend.send(AM_BROADCAST_ADDR, &seqdebugpkt, sizeof(NodeMsg));
-        Sbusy = TRUE;
-      }
+      if (rcvPck->random_integer == -1)
+        return msg;
+      //debugPCK->max = rcvPck->sequence_number;
+      //debugPCK->min = rcvPck->random_integer;
+      //if (!Sbusy) {
+      //  call SAMSend.send(AM_BROADCAST_ADDR, &seqdebugpkt, sizeof(NodeMsg));
+       // Sbusy = TRUE;
+      //}
       
       if (Data[rcvPck->sequence_number] == -1) {
         validIndex += 1;
