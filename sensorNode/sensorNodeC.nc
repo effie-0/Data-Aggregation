@@ -151,6 +151,10 @@ implementation {
 			if (askMsgRcvPck->groupid == GROUP_ID) {
 				call Leds.led2Toggle();
 				for (i = 0;i < SEQ_SIZE;i++) {
+					if (queue_tail == queue_head - 1) {
+						// queue full
+						break;
+					}
 					if (askMsgRcvPck->seqnum[i] > 0 && askMsgRcvPck->seqnum[i] <= MAX_INTEGER_NUM && randomIntegers[askMsgRcvPck->seqnum[i] - 1] != -1) {
 						AskedSequenceNumbersQueue[queue_tail] = askMsgRcvPck->seqnum[i];
 						queue_tail = (queue_tail + 1) % MAX_ASK_MSG_NUM;
