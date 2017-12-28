@@ -67,6 +67,8 @@ implementation {
   uint32_t bit2;
   uint32_t x;
 
+  uint16_t validIndex;
+
   event void Boot.booted() {
     uint16_t j;
 
@@ -104,6 +106,7 @@ implementation {
     call SerialControl.start();
 
     count = 0;
+    validIndex = 0;
   }
 
   event void RadioControl.startDone(error_t err) {
@@ -183,15 +186,15 @@ implementation {
   }
 
   uint16_t Partition(uint16_t lo, uint16_t hi) {
-    uint32_t x;
+    uint32_t num;
     uint32_t temp;
     uint16_t j, k;
 
     // printf("Partition\n");
-    x = Data[hi];
+    num = Data[hi];
     k = lo - 1;
     for(j = lo; j < hi; j++) {
-      if (Data[j] <= x) {
+      if (Data[j] <= num) {
         k += 1;
         if (k != j) {
           temp = Data[k];
@@ -202,7 +205,7 @@ implementation {
     }
     k += 1;
     Data[hi] = Data[k];
-    Data[k] = x;
+    Data[k] = num;
     return k;
   }
 
@@ -414,7 +417,6 @@ implementation {
     if (len == sizeof(SeqMsg)) {
       rcvPck = (SeqMsg*)payload;
       // debug
-      // printf("SeqMsg, seq: %u, int: %ld", rcvPck->sequence_number, rcvPck->random_integer);
       /*
       debugPCK->max = rcvPck->sequence_number;
       debugPCK->min = rcvPck->random_integer;
@@ -425,9 +427,10 @@ implementation {
       }
       */
       if (Data[rcvPck->sequence_number] == -1) {
+        validIndex += 1;
         Data[rcvPck->sequence_number] = rcvPck->random_integer;
       }
-      if (rcvPck->sequence_number == MAX_PCK_NUM) {
+      if (validIndex > 1800 || rcvPck->sequence_number == MAX_PCK_NUM) {
         if (!askStart) {
           // debug
           call Leds.led1Toggle();
