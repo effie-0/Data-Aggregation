@@ -143,7 +143,7 @@ implementation {
       if(call AMSend.send(AM_BROADCAST_ADDR, &askpkt, sizeof(AskMsg)) == SUCCESS) {
         // debug
         //printf("Sent ask message, sequence number: %u\n", askPck->seqnum);
-        call Leds.led0Toggle();
+        call Leds.led0On();
         busy = TRUE;
         //call Leds.led1Toggle();
       }
@@ -331,6 +331,7 @@ implementation {
 
     calFinished = TRUE;
     sendResultMessage();
+    call Leds.led1On();
 
     debugPCK->groupid = GROUP_ID;
     debugPCK->max = result.max;
@@ -398,6 +399,7 @@ implementation {
 
   event void AMSend.sendDone(message_t* msg, error_t err) {
     uint16_t j;
+    call Leds.led0Off();
     // debug
     // printf("sendDone\n");
     busy = FALSE;
@@ -453,7 +455,7 @@ implementation {
       if (validIndex > 1800 || rcvPck->sequence_number == MAX_PCK_NUM) {
         if (!askStart) {
           // debug
-          call Leds.led1Toggle();
+          // call Leds.led1Toggle();
           askStart = TRUE;
           AskForData();
           call dataTimer.startPeriodic(ASK_PERIOD);
